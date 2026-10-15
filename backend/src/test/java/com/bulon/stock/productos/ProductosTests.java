@@ -54,6 +54,12 @@ class ProductosTests extends ApiTest {
     }
 
     @Test
+    void ordenarPorUnCampoInexistenteDa400() throws Exception {
+        get(ADMIN, "/productos?sort=noExiste").andExpect(status().isBadRequest());
+        get(ADMIN, "/movimientos?sort=noExiste").andExpect(status().isBadRequest());
+    }
+
+    @Test
     void camposObligatoriosDan400() throws Exception {
         post(ADMIN, "/productos", Map.of("codigo", "")).andExpect(status().isBadRequest());
     }

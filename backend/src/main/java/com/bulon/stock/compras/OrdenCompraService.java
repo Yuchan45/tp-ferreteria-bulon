@@ -65,14 +65,14 @@ public class OrdenCompraService {
 
     @Transactional
     public OrdenCompraDTO enviar(Long id) {
-        OrdenCompra orden = buscarEntidad(id);
+        OrdenCompra orden = bloquear(id);
         orden.pasarA(EstadoOrdenCompra.ENVIADA);
         return OrdenCompraDTO.from(orden);
     }
 
     @Transactional
     public OrdenCompraDTO cancelar(Long id) {
-        OrdenCompra orden = buscarEntidad(id);
+        OrdenCompra orden = bloquear(id);
         orden.pasarA(EstadoOrdenCompra.CANCELADA);
         return OrdenCompraDTO.from(orden);
     }
@@ -80,7 +80,7 @@ public class OrdenCompraService {
     /** Registra un INGRESO_COMPRA por ítem con el usuario que recibe; todo o nada. */
     @Transactional
     public OrdenCompraDTO recibir(Long id, RecepcionRequest request, String username) {
-        OrdenCompra orden = buscarEntidad(id);
+        OrdenCompra orden = bloquear(id);
         orden.pasarA(EstadoOrdenCompra.RECIBIDA);
         orden.setUbicacionRecepcion(ubicacionService.buscarEntidad(request.ubicacionId()));
         orden.setFechaRecepcion(LocalDateTime.now());
@@ -108,6 +108,11 @@ public class OrdenCompraService {
                                 Math.max(1, 2 * p.puntoPedido() - p.stockTotal()))).toList()))
                 .sorted(Comparator.comparing(SugerenciaCompraDTO::proveedor, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
+    }
+
+    private OrdenCompra bloquear(Long id) {
+        return ordenRepository.findParaCambiarEstado(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Orden de compra", id));
     }
 
     private OrdenCompra buscarEntidad(Long id) {

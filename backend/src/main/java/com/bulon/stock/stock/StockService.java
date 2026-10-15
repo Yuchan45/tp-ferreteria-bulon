@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -25,7 +26,8 @@ public class StockService {
 
     /** Stock de cada producto en todas las ubicaciones (con 0 donde no hay existencia). */
     public Map<Long, List<ExistenciaDTO>> existencias(Collection<Long> productoIds) {
-        Map<Long, Map<Long, Integer>> cantidades = existenciaRepository.findByProductoIdIn(productoIds).stream()
+        Map<Long, Map<Long, Integer>> cantidades = porLotes(productoIds).stream()
+                .flatMap(lote -> existenciaRepository.findByProductoIdIn(lote).stream())
                 .collect(Collectors.groupingBy(e -> e.getProducto().getId(),
                         Collectors.toMap(e -> e.getUbicacion().getId(), Existencia::getCantidad)));
         List<UbicacionDTO> ubicaciones = ubicacionService.listar();
@@ -38,6 +40,16 @@ public class StockService {
                     .toList());
         }
         return resultado;
+    }
+
+    /** SQL Server admite hasta 2.100 parámetros por consulta: los IN largos van en lotes. */
+    private static List<List<Long>> porLotes(Collection<Long> ids) {
+        List<Long> lista = List.copyOf(ids);
+        List<List<Long>> lotes = new ArrayList<>();
+        for (int i = 0; i < lista.size(); i += 1_000) {
+            lotes.add(lista.subList(i, Math.min(i + 1_000, lista.size())));
+        }
+        return lotes;
     }
 
     public List<ExistenciaDTO> existencias(Long productoId) {

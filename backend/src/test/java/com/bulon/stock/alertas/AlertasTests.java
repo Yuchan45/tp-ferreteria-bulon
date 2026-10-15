@@ -43,6 +43,28 @@ class AlertasTests extends ApiTest {
     }
 
     @Test
+    void editarLosUmbralesODesactivarElProductoReevaluaSuAlerta() throws Exception {
+        String codigo = codigoNuevo();
+        long id = leer(post(ADMIN, "/productos", producto(codigo, 2, 5))).get("id").asLong();
+        mover(id, "INGRESO_COMPRA", 4, deposito());
+        assertThat(alertasDe(id)).singleElement()
+                .satisfies(a -> assertThat(a.get("estado").asText()).isEqualTo("PUNTO_PEDIDO"));
+
+        put(ADMIN, "/productos/" + id, producto(codigo, 2, 3));
+        assertThat(alertasDe(id)).singleElement()
+                .satisfies(a -> assertThat(a.get("resueltaEn").isNull()).isFalse());
+
+        put(ADMIN, "/productos/" + id, producto(codigo, 4, 8));
+        assertThat(alertasDe(id)).filteredOn(a -> a.get("resueltaEn").isNull()).singleElement()
+                .satisfies(a -> assertThat(a.get("estado").asText()).isEqualTo("BAJO_MINIMO"));
+
+        var inactivo = producto(codigo, 4, 8);
+        inactivo.put("activo", false);
+        put(ADMIN, "/productos/" + id, inactivo);
+        assertThat(alertasDe(id)).allMatch(a -> !a.get("resueltaEn").isNull());
+    }
+
+    @Test
     void unTrasladoNoCambiaElTotalNiAbreAlertas() throws Exception {
         long id = crearProducto(2, 5);
         mover(id, "INGRESO_COMPRA", 10, deposito());

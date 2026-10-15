@@ -1,6 +1,7 @@
 package com.bulon.stock.common.exception;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -33,9 +34,10 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detalle);
     }
 
-    @ExceptionHandler(PropertyReferenceException.class)
-    public ProblemDetail handleSortInvalido(PropertyReferenceException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    /** {@code sort} con una propiedad inexistente: derivadas → PropertyReference, @Query → InvalidDataAccess. */
+    @ExceptionHandler({PropertyReferenceException.class, InvalidDataAccessApiUsageException.class})
+    public ProblemDetail handleSortInvalido(RuntimeException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Parámetro de orden inválido");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

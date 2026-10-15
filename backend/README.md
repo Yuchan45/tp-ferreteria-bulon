@@ -67,6 +67,8 @@ El seeder (`seed/DataSeeder.java`) carga 3 usuarios con contraseña, 5 proveedor
 ventas. Varios productos quedan bajo el mínimo o en el punto de pedido para probar las alertas.
 Es idempotente: a usuarios existentes sin contraseña les asigna la del seeder.
 Para volver a cargarlo desde cero: `docker compose down -v`.
+Una base creada antes del login (solo V1) queda con usuarios sin contraseña: arrancar una vez con
+`SEED_ENABLED=true` les asigna la del seeder (o cargar `usuarios.password_hash` con un hash BCrypt).
 
 Las variables de entorno del sistema tienen prioridad sobre el `.env`.
 Si falta el archivo, el backend no arranca y muestra un error como

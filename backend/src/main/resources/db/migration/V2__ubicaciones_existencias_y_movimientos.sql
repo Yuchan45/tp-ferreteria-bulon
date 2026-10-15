@@ -113,7 +113,8 @@ ALTER TABLE movimientos_stock ADD
     CONSTRAINT fk_movimientos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id),
     CONSTRAINT ck_movimientos_tipo CHECK (tipo IN
         ('INGRESO_COMPRA', 'SALIDA_VENTA', 'DEVOLUCION', 'ROTURA_PERDIDA', 'AJUSTE', 'TRASLADO')),
-    CONSTRAINT ck_movimientos_cantidad CHECK (cantidad > 0 OR (tipo = 'AJUSTE' AND cantidad <> 0)),
+    -- V1 aceptaba AJUSTE en 0; la aplicación ya no, pero la migración no debe fallar por esas filas
+    CONSTRAINT ck_movimientos_cantidad CHECK (cantidad > 0 OR tipo = 'AJUSTE'),
     CONSTRAINT ck_movimientos_traslado CHECK (
         (tipo = 'TRASLADO' AND ubicacion_destino_id IS NOT NULL AND ubicacion_destino_id <> ubicacion_id)
         OR (tipo <> 'TRASLADO' AND ubicacion_destino_id IS NULL)),

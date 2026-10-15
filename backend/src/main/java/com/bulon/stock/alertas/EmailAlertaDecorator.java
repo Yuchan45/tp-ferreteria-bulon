@@ -4,8 +4,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Un email que falla no debe revertir el movimiento que disparó la alerta: se loguea y sigue. */
+/**
+ * El email sale después del commit: si el movimiento se revierte no se avisa nada, y un SMTP lento
+ * no retiene la transacción. Un email que falla se loguea y no afecta al movimiento.
+ */
 @Slf4j
 public class EmailAlertaDecorator extends AlertaDecorator {
 
@@ -25,6 +30,19 @@ public class EmailAlertaDecorator extends AlertaDecorator {
         mensaje.setTo(destinatario);
         mensaje.setSubject("[Bulón] Reponer " + alerta.getProducto().getCodigo());
         mensaje.setText(alerta.mensaje());
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    mandar(mensaje);
+                }
+            });
+        } else {
+            mandar(mensaje);
+        }
+    }
+
+    private void mandar(SimpleMailMessage mensaje) {
         try {
             mailSender.send(mensaje);
         } catch (MailException e) {

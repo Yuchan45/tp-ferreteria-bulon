@@ -12,7 +12,7 @@ import java.util.Optional;
 /**
  * Observer concreto: avisa al encargado de depósito cuando un producto pasa a estar pendiente de
  * reposición o empeora (punto de pedido → bajo mínimo), y cierra la alerta cuando se repone.
- * Repetir la notificación con el mismo estado no genera otra alerta.
+ * Repetir la notificación con el mismo estado no genera otra alerta; un producto inactivo no tiene alerta abierta.
  */
 @Component
 @RequiredArgsConstructor
@@ -26,7 +26,7 @@ public class EncargadoDepositoObserver implements StockObserver {
         EstadoStock estado = producto.estadoStock(stockTotal);
         Optional<AlertaStock> abierta = alertaRepository.findByProductoIdAndResueltaEnIsNull(producto.getId());
 
-        if (!estado.pendienteReposicion()) {
+        if (!producto.isActivo() || !estado.pendienteReposicion()) {
             abierta.ifPresent(a -> a.setResueltaEn(LocalDateTime.now()));
             return;
         }

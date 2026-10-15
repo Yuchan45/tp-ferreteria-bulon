@@ -2,6 +2,7 @@ package com.bulon.stock.productos;
 
 import com.bulon.stock.common.exception.BusinessException;
 import com.bulon.stock.common.exception.ResourceNotFoundException;
+import com.bulon.stock.movimientos.StockObserver;
 import com.bulon.stock.proveedores.Proveedor;
 import com.bulon.stock.proveedores.ProveedorService;
 import com.bulon.stock.stock.ExistenciaDTO;
@@ -27,6 +28,7 @@ public class ProductoService {
     private final CategoriaService categoriaService;
     private final ProveedorService proveedorService;
     private final StockService stockService;
+    private final List<StockObserver> observadores;
 
     public Page<ProductoDTO> listar(String texto, Long categoriaId, Boolean activo, boolean reposicion, Pageable pageable) {
         String patron = texto == null || texto.isBlank() ? null : "%" + texto.trim().toLowerCase() + "%";
@@ -76,7 +78,10 @@ public class ProductoService {
         Producto producto = buscarEntidad(id);
         verificarCodigoLibre(request.codigo(), id);
         aplicar(request, producto);
-        return aDTO(producto);
+        ProductoDTO dto = aDTO(producto);
+        // Cambiar mínimo, punto de pedido o activo puede abrir o cerrar la alerta sin que haya movimiento
+        observadores.forEach(o -> o.stockActualizado(producto, dto.stockTotal()));
+        return dto;
     }
 
     /** Uso interno de otros módulos (movimientos, compras, reportes). */
