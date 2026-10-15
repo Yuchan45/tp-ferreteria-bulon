@@ -68,6 +68,12 @@ class ProductosTests extends ApiTest {
         mover(id, "SALIDA_VENTA", 16, deposito());
         JsonNode pendientes = leer(get(ADMIN, "/productos?reposicion=true&size=500"));
 
+        Map<String, Object> inactivo = producto(codigoNuevo(), 2, 5);
+        inactivo.put("activo", false);
+        long idInactivo = leer(post(ADMIN, "/productos", inactivo)).get("id").asLong();
+        JsonNode pendientesConInactivo = leer(get(ADMIN, "/productos?reposicion=true&size=500"));
+
+        assertThat(lista(pendientesConInactivo.get("content"))).noneMatch(p -> p.get("id").asLong() == idInactivo);
         assertThat(porTexto.at("/page/totalElements").asInt()).isEqualTo(1);
         assertThat(porTexto.at("/content/0/stockTotal").asInt()).isEqualTo(20);
         assertThat(lista(pendientes.get("content"))).filteredOn(p -> p.get("id").asLong() == id)

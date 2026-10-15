@@ -18,7 +18,7 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     @Query("select p from Producto p where (:texto is null or lower(p.codigo) like :texto or lower(p.nombre) like :texto)"
             + " and (:categoriaId is null or p.categoria.id = :categoriaId)"
             + " and (:activo is null or p.activo = :activo)"
-            + " and (:reposicion = false or " + STOCK_TOTAL + " <= p.puntoPedido)")
+            + " and (:reposicion = false or (p.activo = true and " + STOCK_TOTAL + " <= p.puntoPedido))")
     Page<Producto> buscar(String texto, Long categoriaId, Boolean activo, boolean reposicion, Pageable pageable);
 
     @Query("select p from Producto p where p.activo = true and " + STOCK_TOTAL + " <= p.puntoPedido order by p.codigo")
