@@ -10,3 +10,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+app:
+  seed:
+    # Ignora SEED_ENABLED del .env; DataSeederTests lo activa explícitamente
+    enabled: false

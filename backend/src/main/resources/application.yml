@@ -24,6 +24,11 @@ spring:
       hibernate:
         format_sql: true
 
+app:
+  seed:
+    # Carga datos de ejemplo de la ferretería si las tablas están vacías (solo desarrollo)
+    enabled: ${SEED_ENABLED:false}
+
 management:
   endpoints:
     web:

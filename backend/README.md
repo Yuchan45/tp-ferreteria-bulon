@@ -47,6 +47,11 @@ cp .env.example .env        # desde backend/, y completar DB_PASSWORD
 | `DB_URL`      | `jdbc:sqlserver://localhost:1433;databaseName=bulon_stock;...` |
 | `DB_USER`     | `sa`                                                          |
 | `DB_PASSWORD` | la misma que `MSSQL_SA_PASSWORD` de `docker-compose.yml` (por defecto `Bulon_Dev_2026!`) |
+| `SEED_ENABLED`| `true` carga datos de ejemplo de la ferretería si la base está vacía (default `false`) |
+
+El seeder (`seed/DataSeeder.java`) carga 3 usuarios, 5 proveedores y 25 productos, con el stock
+inicial registrado como movimientos de entrada. Algunos productos quedan bajo el stock mínimo
+para probar las alertas de reposición. Para volver a cargarlo desde cero: `docker compose down -v`.
 
 Las variables de entorno del sistema tienen prioridad sobre el `.env`.
 Si falta el archivo, el backend no arranca y muestra un error como
