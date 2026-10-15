@@ -13,7 +13,7 @@ Código, mensajes y commits en español.
 | Lo mismo + tests contra SQL Server real | `scripts/verify.sh --sqlserver` |
 | Solo tests del backend (H2, sin Docker) | `cd backend && ./mvnw test` |
 | Base de datos | `docker compose up -d` |
-| Backend con datos de ejemplo | `cd backend && cp .env.example .env` (completar `DB_PASSWORD`) y `./mvnw spring-boot:run` |
+| Backend con datos de ejemplo | `cd backend && cp .env.example .env` y `./mvnw spring-boot:run` |
 | Frontend | `cd frontend && npm install && npm run dev` → http://localhost:5173 |
 | API interactiva | http://localhost:8080/api/swagger-ui.html |
 

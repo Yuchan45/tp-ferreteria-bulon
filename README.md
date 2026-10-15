@@ -7,7 +7,7 @@ movimientos con trazabilidad, alertas de reposición, órdenes de compra y repor
 
 ```bash
 docker compose up -d                      # SQL Server en Docker
-cd backend && cp .env.example .env        # completar DB_PASSWORD (por defecto Bulon_Dev_2026!)
+cd backend && cp .env.example .env        # ya trae la contraseña del SQL Server de Docker
 ./mvnw spring-boot:run                    # API en http://localhost:8080/api
 cd ../frontend && npm install && npm run dev   # http://localhost:5173
 ```

@@ -51,7 +51,7 @@ Las credenciales de la base se leen de `backend/.env`, que **no se sube al repos
 La primera vez:
 
 ```bash
-cp .env.example .env        # desde backend/, y completar DB_PASSWORD
+cp .env.example .env        # desde backend/ (ya trae la contraseña por defecto de Docker)
 ```
 
 | Variable      | Ejemplo                                                       |
