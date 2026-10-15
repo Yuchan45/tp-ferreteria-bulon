@@ -5,6 +5,10 @@ Estado al 2026-10-15. Compara el código del repo con la definición del sistema
 y con los patrones comprometidos en la
 [Entrega 2](informes/Grupo%206%20-%20Entrega%202%20-%20Ferreter%C3%ADa%20Bul%C3%B3n.pdf).
 
+> **Actualización:** la rama `entrega-final` implementa F0–F7 y el frontend completo.
+> Qué quedó y dónde: [`AGENTS.md`](../AGENTS.md), [`backend/README.md`](../backend/README.md) y [`patrones.md`](patrones.md).
+> El resto de este documento es el diagnóstico original, sin cambios.
+
 ## 1. Qué está hecho
 
 | Área | Estado | Detalle |

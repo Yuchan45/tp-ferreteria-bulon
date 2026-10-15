@@ -17,3 +17,6 @@ Thumbs.db
 # Entorno
 .env
 *.log
+
+# Copias de conflicto que genera iCloud Drive al sincronizar ~/Documents ("Archivo 2.java")
+* 2.*
