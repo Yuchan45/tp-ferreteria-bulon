@@ -1,0 +1,239 @@
+// Bulón S.R.L. — Sistema de gestión de stock (versión 2)
+// Modelo según las migraciones Flyway V1–V4 (SQL Server)
+
+Project bulon_stock {
+  database_type: 'SQL Server'
+  Note: '''
+    # Bulón S.R.L. — Sistema de gestión de stock (v2)
+    Modelo según las migraciones Flyway V1–V4. Reemplaza al diagrama v1.txt.
+
+    **Cambios respecto de v1:** el stock ya no está en `productos`: vive en
+    `existencias` (producto + ubicación). Se agregan ubicaciones, categorías,
+    la relación N:M producto ↔ proveedor, los movimientos con ubicación y
+    usuario, las alertas de reposición y las órdenes de compra.
+
+    **Enums:** en SQL Server, estos campos se guardan como texto (varchar) con
+    un CHECK que limita los valores. Se modelan como Enum para que el diagrama
+    muestre los valores posibles.
+
+    **Índices únicos filtrados:** `proveedores.cuit` (solo si no es NULL) y
+    `alertas_stock.producto_id` (solo si `resuelta_en` es NULL).
+  '''
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+Enum tipo_movimiento {
+  INGRESO_COMPRA
+  SALIDA_VENTA
+  DEVOLUCION
+  ROTURA_PERDIDA
+  AJUSTE
+  TRASLADO
+}
+
+Enum rol {
+  ADMINISTRADOR
+  ENCARGADO_DEPOSITO
+  VENDEDOR
+}
+
+Enum unidad_medida {
+  UNIDAD
+  METRO
+  KILOGRAMO
+  LITRO
+  CAJA
+  ROLLO
+  PAQUETE
+}
+
+Enum estado_alerta {
+  BAJO_MINIMO
+  PUNTO_PEDIDO
+}
+
+Enum estado_orden_compra {
+  BORRADOR
+  ENVIADA
+  RECIBIDA
+  CANCELADA
+}
+
+// ─────────────────────────── Tablas ──────────────────────────
+
+Table proveedores {
+  id           bigint       [pk, increment]
+  razon_social varchar(150) [not null]
+  cuit         varchar(13)  [note: 'Único solo si no es NULL (índice filtrado uq_proveedores_cuit)']
+  telefono     varchar(255)
+  email        varchar(255)
+
+  indexes {
+    cuit [unique, name: 'uq_proveedores_cuit', note: 'Filtrado: WHERE cuit IS NOT NULL']
+  }
+
+  Note: 'Un proveedor abastece a muchos productos (N:M) y recibe muchas órdenes de compra.'
+}
+
+Table categorias {
+  id     bigint      [pk, increment]
+  nombre varchar(80) [not null, unique]
+
+  Note: 'Una categoría agrupa muchos productos.'
+}
+
+Table ubicaciones {
+  id     bigint      [pk, increment]
+  nombre varchar(50) [not null, unique, note: 'Se cargan dos: Sucursal y Depósito']
+}
+
+Table productos {
+  id                     bigint        [pk, increment]
+  codigo                 varchar(50)   [not null, unique]
+  nombre                 varchar(120)  [not null]
+  descripcion            varchar(200)
+  categoria_id           bigint        [not null]
+  unidad_medida          unidad_medida [not null, default: 'UNIDAD', note: 'varchar(20) en la base']
+  precio                 numeric(12,2)
+  stock_minimo           int           [not null, default: 0, note: 'CHECK >= 0. Stock total <= este valor: alerta BAJO_MINIMO']
+  punto_pedido           int           [not null, default: 0, note: 'CHECK >= stock_minimo. Stock total <= este valor: alerta PUNTO_PEDIDO']
+  activo                 bit           [not null, default: 1, note: 'Baja lógica']
+  proveedor_preferido_id bigint
+
+  Note: '''
+    El stock del producto es la suma de sus `existencias` en todas las ubicaciones.
+    Un producto tiene muchas existencias, movimientos y alertas.
+  '''
+}
+
+Table producto_proveedor {
+  producto_id  bigint [not null]
+  proveedor_id bigint [not null]
+
+  indexes {
+    (producto_id, proveedor_id) [pk]
+    proveedor_id [name: 'ix_producto_proveedor_proveedor']
+  }
+
+  Note: 'Relación N:M: un producto puede comprarse a varios proveedores.'
+}
+
+Table existencias {
+  id           bigint [pk, increment]
+  producto_id  bigint [not null]
+  ubicacion_id bigint [not null]
+  cantidad     int    [not null, default: 0, note: 'CHECK >= 0: no admite stock negativo']
+  version      bigint [not null, default: 0, note: 'Bloqueo optimista contra salidas simultáneas']
+
+  indexes {
+    (producto_id, ubicacion_id) [unique, name: 'uq_existencias_producto_ubicacion']
+  }
+
+  Note: 'Stock de un producto en una ubicación. La fila puede no existir si nunca hubo stock allí.'
+}
+
+Table usuarios {
+  id            bigint       [pk, increment]
+  username      varchar(50)  [not null, unique]
+  nombre        varchar(100) [not null]
+  rol           rol          [not null, note: 'varchar(30) en la base']
+  activo        bit          [not null, default: 1]
+  password_hash varchar(100) [note: 'NULL = todavía no puede ingresar (sin contraseña asignada)']
+
+  Note: 'Cada movimiento y cada orden de compra guardan el usuario que los registró.'
+}
+
+Table movimientos_stock {
+  id                   bigint          [pk, increment]
+  producto_id          bigint          [not null]
+  tipo                 tipo_movimiento [not null, note: 'varchar(20) en la base']
+  cantidad             int             [not null, note: 'Siempre > 0; solo AJUSTE puede ser negativo (nunca 0)']
+  fecha                datetime2       [not null, default: `SYSDATETIME()`]
+  observacion          varchar(255)
+  ubicacion_id         bigint          [not null, note: 'Ubicación afectada; en TRASLADO es el origen']
+  ubicacion_destino_id bigint          [note: 'Solo en TRASLADO y distinta del origen; NULL en los demás tipos']
+  usuario_id           bigint          [not null]
+  motivo               varchar(255)    [note: 'Obligatorio en AJUSTE']
+
+  indexes {
+    (producto_id, fecha) [name: 'ix_movimientos_producto_fecha']
+    fecha [name: 'ix_movimientos_fecha']
+    usuario_id [name: 'ix_movimientos_usuario']
+  }
+
+  Note: '''
+    INGRESO_COMPRA y DEVOLUCION suman en la ubicación; SALIDA_VENTA y
+    ROTURA_PERDIDA restan; AJUSTE suma o resta según el signo; TRASLADO resta
+    en el origen y suma en el destino.
+  '''
+}
+
+Table alertas_stock {
+  id          bigint        [pk, increment]
+  producto_id bigint        [not null]
+  estado      estado_alerta [not null, note: 'varchar(20) en la base']
+  stock       int           [not null, note: 'Stock total del producto cuando se generó la alerta']
+  fecha       datetime2     [not null]
+  resuelta_en datetime2     [note: 'NULL mientras la alerta sigue abierta']
+
+  indexes {
+    producto_id [unique, name: 'uq_alertas_abierta_por_producto', note: 'Filtrado: WHERE resuelta_en IS NULL (una alerta abierta por producto)']
+    fecha [name: 'ix_alertas_fecha']
+  }
+
+  Note: 'Se resuelve sola cuando el stock vuelve a superar el punto de pedido.'
+}
+
+Table ordenes_compra {
+  id                     bigint              [pk, increment]
+  proveedor_id           bigint              [not null]
+  estado                 estado_orden_compra [not null, note: 'varchar(20) en la base. BORRADOR → ENVIADA → RECIBIDA; CANCELADA si no fue recibida']
+  usuario_id             bigint              [not null]
+  fecha_creacion         datetime2           [not null]
+  fecha_recepcion        datetime2
+  ubicacion_recepcion_id bigint              [note: 'Dónde se recibió la mercadería']
+  observacion            varchar(255)
+
+  indexes {
+    (estado, fecha_creacion) [name: 'ix_ordenes_compra_estado']
+  }
+
+  Note: 'Una orden de compra tiene muchos ítems.'
+}
+
+Table ordenes_compra_items {
+  id          bigint [pk, increment]
+  orden_id    bigint [not null]
+  producto_id bigint [not null]
+  cantidad    int    [not null, note: 'CHECK > 0']
+
+  indexes {
+    (orden_id, producto_id) [unique, name: 'uq_ordenes_compra_items']
+  }
+}
+
+// ───────────────────────── Relaciones ────────────────────────
+
+Ref: productos.categoria_id > categorias.id
+Ref: productos.proveedor_preferido_id > proveedores.id
+
+Ref: producto_proveedor.producto_id > productos.id
+Ref: producto_proveedor.proveedor_id > proveedores.id
+
+Ref: existencias.producto_id > productos.id
+Ref: existencias.ubicacion_id > ubicaciones.id
+
+Ref: movimientos_stock.producto_id > productos.id
+Ref: movimientos_stock.ubicacion_id > ubicaciones.id
+Ref: movimientos_stock.ubicacion_destino_id > ubicaciones.id
+Ref: movimientos_stock.usuario_id > usuarios.id
+
+Ref: alertas_stock.producto_id > productos.id
+
+Ref: ordenes_compra.proveedor_id > proveedores.id
+Ref: ordenes_compra.usuario_id > usuarios.id
+Ref: ordenes_compra.ubicacion_recepcion_id > ubicaciones.id
+
+Ref: ordenes_compra_items.orden_id > ordenes_compra.id
+Ref: ordenes_compra_items.producto_id > productos.id
