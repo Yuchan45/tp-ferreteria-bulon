@@ -2,7 +2,9 @@ name: bulon-stock
 
 services:
   sqlserver:
+    # SQL Server solo se publica para amd64; en Apple Silicon corre emulado (Rosetta en Docker Desktop).
     image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
     container_name: bulon-sqlserver
     environment:
       ACCEPT_EULA: "Y"
@@ -22,6 +24,7 @@ services:
   # Crea la base bulon_stock (si no existe) y termina. Las tablas las crea Flyway al iniciar el backend.
   sqlserver-init:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
     depends_on:
       sqlserver:
         condition: service_healthy

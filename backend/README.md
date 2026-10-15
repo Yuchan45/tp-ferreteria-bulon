@@ -28,6 +28,10 @@ docker compose down         # detiene (los datos se conservan en el volumen)
 docker compose down -v      # detiene y BORRA los datos
 ```
 
+> **macOS con Apple Silicon (M1/M2/M3…):** Microsoft solo publica la imagen de SQL Server para `amd64`, por eso
+> el compose fija `platform: linux/amd64`. En Docker Desktop activá *Settings → General → "Use Rosetta for
+> x86_64/amd64 emulation on Apple Silicon"* para que corra emulado con buen rendimiento.
+
 El esquema lo manejan las migraciones de **Flyway** en `src/main/resources/db/migration`,
 que se aplican solas al iniciar el backend. Hibernate solo valida que las entidades coincidan
 (`ddl-auto: validate`). Para cambiar el modelo se agrega un script nuevo (`V2__descripcion.sql`, ...);
