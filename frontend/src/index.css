@@ -566,6 +566,10 @@ thead th {
   white-space: nowrap;
 }
 
+.code {
+  white-space: nowrap;
+}
+
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;

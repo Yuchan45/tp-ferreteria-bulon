@@ -82,7 +82,7 @@ export default function Productos() {
         <tbody>
           {lista.rows.map((p) => (
             <tr key={p.id} className={p.activo ? undefined : 'row--inactive'}>
-              <td>{p.codigo}</td>
+              <td className="code">{p.codigo}</td>
               <td>
                 {p.nombre} {!p.activo && <Badge clase="pending">Inactivo</Badge>}
               </td>

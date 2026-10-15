@@ -70,7 +70,7 @@ public class ProductoService {
         verificarCodigoLibre(request.codigo(), null);
         Producto producto = new Producto();
         aplicar(request, producto);
-        return aDTO(productoRepository.save(producto));
+        return notificar(productoRepository.save(producto));
     }
 
     @Transactional
@@ -78,8 +78,12 @@ public class ProductoService {
         Producto producto = buscarEntidad(id);
         verificarCodigoLibre(request.codigo(), id);
         aplicar(request, producto);
+        return notificar(producto);
+    }
+
+    /** Alta o cambio de mínimo, punto de pedido o activo: puede abrir o cerrar la alerta sin movimiento. */
+    private ProductoDTO notificar(Producto producto) {
         ProductoDTO dto = aDTO(producto);
-        // Cambiar mínimo, punto de pedido o activo puede abrir o cerrar la alerta sin que haya movimiento
         observadores.forEach(o -> o.stockActualizado(producto, dto.stockTotal()));
         return dto;
     }

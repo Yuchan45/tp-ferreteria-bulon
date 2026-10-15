@@ -93,7 +93,7 @@ function Grupo({ grupo, proveedores, onCreada }: { grupo: Sugerencia; proveedore
         {grupo.items.map((i) => (
           <li key={i.productoId} className="line">
             <span>
-              <EstadoBadge estado={i.estado} /> {i.productoCodigo} · {i.productoNombre} <small className="muted">(stock {i.stockTotal} / pedido {i.puntoPedido})</small>
+              <EstadoBadge estado={i.estado} /> {i.productoCodigo} · {i.productoNombre} <small className="muted">(stock {i.stockTotal} · punto de pedido {i.puntoPedido})</small>
             </span>
             <input
               type="number"

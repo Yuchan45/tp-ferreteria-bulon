@@ -14,6 +14,7 @@ npm run lint       # oxlint
 El backend tiene que estar corriendo en `http://localhost:8080` (ver `../backend/README.md`; con
 `SEED_ENABLED=true` crea los usuarios de abajo). Vite redirige `/api` al backend (`vite.config.ts`),
 así que no hace falta CORS.
+Si el backend corre en otro puerto: `API_URL=http://localhost:18080 npm run dev`.
 
 ## Usuarios de prueba
 

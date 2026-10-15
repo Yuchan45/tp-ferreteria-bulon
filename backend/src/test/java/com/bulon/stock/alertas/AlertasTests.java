@@ -16,28 +16,41 @@ class AlertasTests extends ApiTest {
                 .toList();
     }
 
+    private List<JsonNode> abiertasDe(long productoId) throws Exception {
+        return alertasDe(productoId).stream().filter(a -> a.get("resueltaEn").isNull()).toList();
+    }
+
+    @Test
+    void unProductoNuevoSinStockQuedaConAlertaAbiertaHastaQueIngresaMercaderia() throws Exception {
+        long id = crearProducto(2, 5);
+        assertThat(abiertasDe(id)).singleElement()
+                .satisfies(a -> assertThat(a.get("estado").asText()).isEqualTo("BAJO_MINIMO"));
+
+        mover(id, "INGRESO_COMPRA", 10, deposito());
+
+        assertThat(abiertasDe(id)).isEmpty();
+    }
+
     @Test
     void alertaSeAbreEnElPuntoDePedidoEscalaBajoElMinimoYSeCierraAlReponer() throws Exception {
         long id = crearProducto(2, 5);
         mover(id, "INGRESO_COMPRA", 10, deposito());
-        assertThat(alertasDe(id)).isEmpty();
 
         mover(id, "SALIDA_VENTA", 6, deposito());
-        assertThat(alertasDe(id)).singleElement().satisfies(a -> {
+        assertThat(abiertasDe(id)).singleElement().satisfies(a -> {
             assertThat(a.get("estado").asText()).isEqualTo("PUNTO_PEDIDO");
             assertThat(a.get("stock").asInt()).isEqualTo(4);
-            assertThat(a.get("resueltaEn").isNull()).isTrue();
         });
 
         mover(id, "SALIDA_VENTA", 2, deposito());
-        assertThat(alertasDe(id)).singleElement().satisfies(a -> {
+        assertThat(abiertasDe(id)).singleElement().satisfies(a -> {
             assertThat(a.get("estado").asText()).isEqualTo("BAJO_MINIMO");
             assertThat(a.get("stock").asInt()).isEqualTo(2);
         });
 
         mover(id, "INGRESO_COMPRA", 10, deposito());
-        assertThat(alertasDe(id)).singleElement()
-                .satisfies(a -> assertThat(a.get("resueltaEn").isNull()).isFalse());
+        assertThat(abiertasDe(id)).isEmpty();
+        assertThat(alertasDe(id)).hasSize(2);
         assertThat(lista(leer(get(ADMIN, "/alertas?size=1000")).get("content")))
                 .noneMatch(a -> a.get("productoId").asLong() == id);
     }
@@ -47,21 +60,20 @@ class AlertasTests extends ApiTest {
         String codigo = codigoNuevo();
         long id = leer(post(ADMIN, "/productos", producto(codigo, 2, 5))).get("id").asLong();
         mover(id, "INGRESO_COMPRA", 4, deposito());
-        assertThat(alertasDe(id)).singleElement()
+        assertThat(abiertasDe(id)).singleElement()
                 .satisfies(a -> assertThat(a.get("estado").asText()).isEqualTo("PUNTO_PEDIDO"));
 
         put(ADMIN, "/productos/" + id, producto(codigo, 2, 3));
-        assertThat(alertasDe(id)).singleElement()
-                .satisfies(a -> assertThat(a.get("resueltaEn").isNull()).isFalse());
+        assertThat(abiertasDe(id)).isEmpty();
 
         put(ADMIN, "/productos/" + id, producto(codigo, 4, 8));
-        assertThat(alertasDe(id)).filteredOn(a -> a.get("resueltaEn").isNull()).singleElement()
+        assertThat(abiertasDe(id)).singleElement()
                 .satisfies(a -> assertThat(a.get("estado").asText()).isEqualTo("BAJO_MINIMO"));
 
         var inactivo = producto(codigo, 4, 8);
         inactivo.put("activo", false);
         put(ADMIN, "/productos/" + id, inactivo);
-        assertThat(alertasDe(id)).allMatch(a -> !a.get("resueltaEn").isNull());
+        assertThat(abiertasDe(id)).isEmpty();
     }
 
     @Test
@@ -71,6 +83,6 @@ class AlertasTests extends ApiTest {
 
         mover(ADMIN, id, "TRASLADO", 9, deposito(), sucursal(), null);
 
-        assertThat(alertasDe(id)).isEmpty();
+        assertThat(abiertasDe(id)).isEmpty();
     }
 }

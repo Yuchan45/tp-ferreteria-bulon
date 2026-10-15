@@ -49,7 +49,7 @@ export default function Panel() {
                     <tr key={m.id}>
                       <td>{fecha(m.fecha)}</td>
                       <td><Badge clase="pending">{TIPOS[m.tipo]}</Badge></td>
-                      <td>{m.productoCodigo}</td>
+                      <td className="code">{m.productoCodigo}</td>
                       <td className="num">{m.cantidad}</td>
                     </tr>
                   ))}

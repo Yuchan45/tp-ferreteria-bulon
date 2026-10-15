@@ -27,7 +27,7 @@ export default function Reposicion() {
           <tbody>
             {productos.rows.map((p) => (
               <tr key={p.id}>
-                <td>{p.codigo}</td>
+                <td className="code">{p.codigo}</td>
                 <td>{p.nombre}</td>
                 <td className="num"><strong>{p.stockTotal}</strong></td>
                 <td className="num">{p.stockMinimo}</td>

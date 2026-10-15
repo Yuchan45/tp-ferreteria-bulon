@@ -16,6 +16,7 @@ class ReportesTests extends ApiTest {
 
         assertThat(panel.get("productosActivos").asLong()).isGreaterThanOrEqualTo(25);
         assertThat(panel.get("pendientesReposicion").asLong()).isGreaterThanOrEqualTo(panel.get("bajoMinimo").asLong());
+        assertThat(panel.get("alertasAbiertas").asLong()).isEqualTo(panel.get("pendientesReposicion").asLong());
         assertThat(lista(panel.get("unidadesPorUbicacion"))).extracting(u -> u.get("ubicacion").asText())
                 .containsExactly("Sucursal", "Depósito");
         assertThat(panel.get("ultimosMovimientos")).isNotEmpty();
