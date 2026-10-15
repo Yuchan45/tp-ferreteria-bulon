@@ -12,6 +12,10 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      # Si la base no responde, fallar a los 5 s (por defecto 30 s) para que
+      # la API y /api/health informen el problema rápido
+      connection-timeout: 5000
   flyway:
     # El esquema lo crean las migraciones de src/main/resources/db/migration
     enabled: true

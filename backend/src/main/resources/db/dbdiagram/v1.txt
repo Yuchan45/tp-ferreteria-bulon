@@ -1,0 +1,92 @@
+// Bulón S.R.L. — Sistema de gestión de stock
+// Modelo generado a partir de las entidades JPA (Hibernate + SQL Server)
+
+Project bulon_stock {
+  database_type: 'SQL Server'
+  Note: '''
+    # Bulón S.R.L. — Sistema de gestión de stock
+    Modelo generado a partir de las entidades JPA (Hibernate + SQL Server).
+
+    **Enums:** en SQL Server, `tipo` y `rol` se guardan como texto (varchar).
+    Se modelan como Enum para que el diagrama muestre los valores posibles.
+
+    **Valores iniciales:** stock_actual = 0, stock_minimo = 0, activo = true y la
+    fecha del movimiento los completa el código Java al crear el registro.
+    La base no tiene esos valores por defecto.
+  '''
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+Enum tipo_movimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+Enum rol {
+  ADMINISTRADOR
+  ENCARGADO_DEPOSITO
+  VENDEDOR
+}
+
+// ─────────────────────────── Tablas ──────────────────────────
+
+Table proveedores {
+  id           bigint       [pk, increment]
+  razon_social varchar(150) [not null]
+  cuit         varchar(13)  [unique]
+  telefono     varchar(255)
+  email        varchar(255)
+
+  Note: 'Un proveedor tiene muchos productos.'
+}
+
+Table productos {
+  id           bigint        [pk, increment]
+  codigo       varchar(50)   [not null, unique]
+  descripcion  varchar(200)  [not null]
+  precio       numeric(12,2)
+  stock_actual int           [not null, note: 'Se actualiza con cada movimiento. Inicial = 0 (lo setea Java)']
+  stock_minimo int           [not null, note: 'Umbral para alerta de reposición. Inicial = 0 (lo setea Java)']
+  proveedor_id bigint
+
+  Note: 'Un producto tiene muchos movimientos de stock.'
+}
+
+Table movimientos_stock {
+  id          bigint          [pk, increment]
+  producto_id bigint          [not null]
+  tipo        tipo_movimiento [not null, note: 'varchar(20) en la base']
+  cantidad    int             [not null, note: 'Negativa solo en AJUSTE']
+  fecha       datetime2       [not null, note: 'La completa el código Java al crear el registro']
+  observacion varchar(255)
+
+  indexes {
+    (producto_id, fecha) [name: 'ix_movimientos_producto_fecha', note: 'Propuesto: NO existe en la base actual']
+  }
+
+  Note: '''
+    El índice (producto_id, fecha) no existe hoy: Hibernate solo crea la FK.
+    Se agrega porque conviene para la consulta del historial.
+    Para reflejar exactamente la base actual, borrar el bloque indexes.
+  '''
+}
+
+Table usuarios {
+  id       bigint       [pk, increment]
+  username varchar(50)  [not null, unique]
+  nombre   varchar(100) [not null]
+  rol      rol          [not null, note: 'varchar(30) en la base']
+  activo   bit          [not null, note: 'Inicial = true (lo setea Java)']
+
+  Note: '''
+    Todavía no se relaciona con ninguna tabla.
+    Por ejemplo, los movimientos no guardan qué usuario los registró.
+  '''
+}
+
+// ───────────────────────── Relaciones ────────────────────────
+
+Ref: productos.proveedor_id > proveedores.id
+Ref: movimientos_stock.producto_id > productos.id
