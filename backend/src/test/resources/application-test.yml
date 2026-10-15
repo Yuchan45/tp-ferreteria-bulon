@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:bulon_stock;MODE=MSSQLServer;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    # Las migraciones son T-SQL de SQL Server; en H2 el esquema lo genera Hibernate
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop

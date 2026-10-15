@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: bulon-stock
+  config:
+    # Credenciales desde backend/.env (si se ejecuta desde backend/ o desde la raíz del repo).
+    # Las variables de entorno del sistema tienen prioridad sobre el archivo.
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:backend/.env[.properties]
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  flyway:
+    # El esquema lo crean las migraciones de src/main/resources/db/migration
+    enabled: true
+  jpa:
+    hibernate:
+      # Hibernate solo verifica que las entidades coincidan con el esquema creado por Flyway
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+management:
+  endpoints:
+    web:
+      # Expone los endpoints de Actuator en la raíz de la API: /api/health
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # Muestra el estado de cada componente (db, diskSpace) sin datos sensibles
+      show-components: always
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
