@@ -19,7 +19,8 @@ public class Proveedor {
     @Column(nullable = false, length = 150)
     private String razonSocial;
 
-    @Column(unique = true, length = 13)
+    /** Único entre los no nulos: lo garantiza el índice filtrado uq_proveedores_cuit y ProveedorService. */
+    @Column(length = 13)
     private String cuit;
 
     private String telefono;

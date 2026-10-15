@@ -1,71 +1,79 @@
 package com.bulon.stock.seed;
 
-import com.bulon.stock.movimientos.MovimientoStockDTO;
-import com.bulon.stock.movimientos.MovimientoStockService;
-import com.bulon.stock.movimientos.TipoMovimiento;
-import com.bulon.stock.productos.ProductoDTO;
-import com.bulon.stock.productos.ProductoService;
-import com.bulon.stock.proveedores.ProveedorService;
-import com.bulon.stock.usuarios.UsuarioService;
+import com.bulon.stock.ApiTest;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = {
-        "app.seed.enabled=true",
-        // Base H2 propia para no compartir datos con el resto de los tests
-        "spring.datasource.url=jdbc:h2:mem:seed_test;MODE=MSSQLServer;DB_CLOSE_DELAY=-1"
-})
-@ActiveProfiles("test")
-class DataSeederTests {
+class DataSeederTests extends ApiTest {
+
+    private static final Set<String> BAJO_MINIMO = Set.of("BUL-002", "HER-003", "ELE-003", "PLO-002", "PIN-004", "PIN-005");
+    private static final Set<String> PUNTO_PEDIDO = Set.of("HER-004", "ELE-001", "ELE-005", "PLO-003", "PLO-005");
 
     @Autowired
     private DataSeeder dataSeeder;
-    @Autowired
-    private UsuarioService usuarioService;
-    @Autowired
-    private ProveedorService proveedorService;
-    @Autowired
-    private ProductoService productoService;
-    @Autowired
-    private MovimientoStockService movimientoService;
 
-    @Test
-    void cargaUsuariosProveedoresYProductos() {
-        assertThat(usuarioService.listar()).hasSize(3);
-        assertThat(proveedorService.listar()).hasSize(5);
-        assertThat(productoService.listar()).hasSize(25);
+    private List<JsonNode> productosDelSeed() throws Exception {
+        return lista(leer(get(ADMIN, "/productos?size=1000")).get("content")).stream()
+                .filter(p -> !p.get("codigo").asText().startsWith("T-"))
+                .toList();
     }
 
     @Test
-    void dejaProductosBajoStockMinimoParaLasAlertas() {
-        assertThat(productoService.listarBajoStockMinimo())
-                .extracting(ProductoDTO::codigo)
-                .containsExactlyInAnyOrder("BUL-002", "HER-003", "ELE-003", "PLO-002", "PIN-004", "PIN-005");
+    void cargaCatalogoConStockRepartidoEntreUbicaciones() throws Exception {
+        List<JsonNode> productos = productosDelSeed();
+
+        assertThat(productos).hasSize(25);
+        assertThat(productos).filteredOn(p -> p.get("codigo").asText().equals("BUL-001")).singleElement()
+                .satisfies(p -> {
+                    assertThat(p.get("categoria").asText()).isEqualTo("Bulonería y fijaciones");
+                    assertThat(p.at("/existencias/0/cantidad").asInt()).isEqualTo(135);
+                    assertThat(p.at("/existencias/1/cantidad").asInt()).isEqualTo(595);
+                });
     }
 
     @Test
-    void elStockDeCadaProductoCoincideConSusMovimientos() {
-        for (ProductoDTO producto : productoService.listar()) {
-            List<MovimientoStockDTO> movimientos = movimientoService.listarPorProducto(producto.id());
-            int stockSegunMovimientos = movimientos.stream()
-                    .mapToInt(m -> m.tipo() == TipoMovimiento.SALIDA ? -m.cantidad() : m.cantidad())
-                    .sum();
-            assertThat(producto.stockActual()).as(producto.codigo()).isEqualTo(stockSegunMovimientos);
+    void dejaProductosBajoMinimoYEnPuntoDePedidoParaLasAlertas() throws Exception {
+        List<JsonNode> productos = productosDelSeed();
+
+        assertThat(productos).filteredOn(p -> p.get("estadoStock").asText().equals("BAJO_MINIMO"))
+                .extracting(p -> p.get("codigo").asText()).containsExactlyInAnyOrderElementsOf(BAJO_MINIMO);
+        assertThat(productos).filteredOn(p -> p.get("estadoStock").asText().equals("PUNTO_PEDIDO"))
+                .extracting(p -> p.get("codigo").asText()).containsExactlyInAnyOrderElementsOf(PUNTO_PEDIDO);
+    }
+
+    @Test
+    void elStockDeCadaProductoCoincideConSuHistorial() throws Exception {
+        for (JsonNode producto : productosDelSeed()) {
+            int segunMovimientos = 0;
+            for (JsonNode m : leer(get(ADMIN, "/movimientos?productoId={id}&size=1000", producto.get("id").asLong()))
+                    .get("content")) {
+                int cantidad = m.get("cantidad").asInt();
+                segunMovimientos += switch (m.get("tipo").asText()) {
+                    case "SALIDA_VENTA", "ROTURA_PERDIDA" -> -cantidad;
+                    case "TRASLADO" -> 0;
+                    default -> cantidad;
+                };
+            }
+            assertThat(producto.get("stockTotal").asInt()).as(producto.get("codigo").asText())
+                    .isEqualTo(segunMovimientos);
         }
     }
 
     @Test
-    void noDuplicaDatosSiSeEjecutaDeNuevo() {
+    void noDuplicaDatosSiSeEjecutaDeNuevo() throws Exception {
+        int usuarios = leer(get(ADMIN, "/usuarios")).size();
+        int proveedores = leer(get(ADMIN, "/proveedores")).size();
+
         dataSeeder.run(null);
 
-        assertThat(usuarioService.listar()).hasSize(3);
-        assertThat(proveedorService.listar()).hasSize(5);
-        assertThat(productoService.listar()).hasSize(25);
+        assertThat(leer(get(ADMIN, "/usuarios")).size()).isEqualTo(usuarios);
+        assertThat(leer(get(ADMIN, "/proveedores")).size()).isEqualTo(proveedores);
+        assertThat(productosDelSeed()).hasSize(25);
     }
 }

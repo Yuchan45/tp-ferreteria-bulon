@@ -28,4 +28,8 @@ public class Usuario {
 
     @Column(nullable = false)
     private boolean activo = true;
+
+    /** BCrypt. Null = todavía no puede iniciar sesión. */
+    @Column(length = 100)
+    private String passwordHash;
 }

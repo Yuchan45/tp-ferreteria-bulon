@@ -27,11 +27,24 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # Carga perezosa en lotes: evita N+1 al listar productos con categoría y proveedores
+        default_batch_fetch_size: 50
 
 app:
   seed:
     # Carga datos de ejemplo de la ferretería si las tablas están vacías (solo desarrollo)
     enabled: ${SEED_ENABLED:false}
+  alertas:
+    # Destinatario de las alertas de reposición por email (EmailAlertaDecorator).
+    # Requiere además un servidor SMTP en spring.mail.host (variable SPRING_MAIL_HOST).
+    email: ${ALERTAS_EMAIL:}
+  reposicion:
+    # Días que tarda un proveedor en entregar: base del punto de pedido sugerido (reporte de rotación)
+    dias-entrega: 7
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
 
 management:
   endpoints:

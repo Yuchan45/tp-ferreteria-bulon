@@ -1,17 +1,26 @@
+# Por defecto los tests corren en H2 (rápido, sin Docker). scripts/test-sqlserver.sh define las
+# variables TEST_* para correr los mismos tests contra SQL Server con las migraciones de Flyway.
 spring:
   datasource:
-    url: jdbc:h2:mem:bulon_stock;MODE=MSSQLServer;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: ${TEST_DB_URL:jdbc:h2:mem:bulon_stock;MODE=MSSQLServer;DB_CLOSE_DELAY=-1}
+    username: ${TEST_DB_USER:sa}
+    password: ${TEST_DB_PASSWORD:}
+    driver-class-name: ${TEST_DB_DRIVER:org.h2.Driver}
   flyway:
-    # Las migraciones son T-SQL de SQL Server; en H2 el esquema lo genera Hibernate
-    enabled: false
+    # En SQL Server: base bulon_stock_test vaciada y migrada al iniciar (TestFlywayConfig)
+    enabled: ${TEST_FLYWAY:false}
+    clean-disabled: false
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: ${TEST_DDL_AUTO:create-drop}
+    # En H2, data.sql carga las ubicaciones y la categoría que en SQL Server inserta V2
+    defer-datasource-initialization: ${TEST_DEFER_INIT:true}
+  sql:
+    init:
+      mode: ${TEST_SQL_INIT:always}
+      encoding: UTF-8
 
 app:
   seed:
-    # Ignora SEED_ENABLED del .env; DataSeederTests lo activa explícitamente
-    enabled: false
+    # Los tests usan los usuarios (admin/deposito/ventas) y el catálogo del seeder
+    enabled: true
