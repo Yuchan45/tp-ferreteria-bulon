@@ -1,305 +1,132 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+/* Solo modo claro: las clases dark: de shadcn se activan únicamente con una clase .dark
+   (que la app no usa), no con la preferencia del sistema operativo. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system "industrial limpia" (ver Penpot: página Design System).
+ * Solo modo claro. Los tokens de shadcn se mapean a la paleta de Bulón y se suman
+ * tokens propios para estados de stock y tipos de movimiento.
+ */
+
+@theme inline {
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-sans);
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary-hover: var(--primary-hover);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-muted: var(--sidebar-muted);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-brand: var(--brand);
+
+    --color-stock-ok: var(--stock-ok);
+    --color-stock-ok-bg: var(--stock-ok-bg);
+    --color-stock-low: var(--stock-low);
+    --color-stock-low-bg: var(--stock-low-bg);
+    --color-stock-out: var(--stock-out);
+    --color-stock-out-bg: var(--stock-out-bg);
+
+    --color-mov-ingreso: var(--mov-ingreso);
+    --color-mov-ingreso-bg: var(--mov-ingreso-bg);
+    --color-mov-salida: var(--mov-salida);
+    --color-mov-salida-bg: var(--mov-salida-bg);
+    --color-mov-ajuste: var(--mov-ajuste);
+    --color-mov-ajuste-bg: var(--mov-ajuste-bg);
+
+    --radius-sm: calc(var(--radius) * 0.5);
+    --radius-md: calc(var(--radius) * 0.75);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.5);
+    --radius-2xl: calc(var(--radius) * 2);
+    --radius-4xl: 9999px;
+}
+
 :root {
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --border: #e2e5ea;
-  --text: #1f2933;
-  --text-muted: #5f6b7a;
-  --header-bg: #1f2933;
-  --header-text: #f8fafc;
-  --accent: #e8590c;
-  --accent-hover: #c94c09;
+    --radius: 0.5rem;
 
-  --ok: #1f8a4c;
-  --ok-bg: #e6f4ec;
-  --warn: #b26b00;
-  --warn-bg: #fdf1dc;
-  --error: #c8312b;
-  --error-bg: #fbe7e6;
-  --pending: #6b7785;
-  --pending-bg: #eceff2;
+    --background: #F8FAFC;
+    --foreground: #0F172A;
+    --card: #FFFFFF;
+    --card-foreground: #0F172A;
+    --popover: #FFFFFF;
+    --popover-foreground: #0F172A;
+    --primary: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --primary-hover: #1D4ED8;
+    --secondary: #F1F5F9;
+    --secondary-foreground: #0F172A;
+    --muted: #F1F5F9;
+    --muted-foreground: #64748B;
+    --accent: #F1F5F9;
+    --accent-foreground: #0F172A;
+    --destructive: #DC2626;
+    --border: #E2E8F0;
+    --input: #E2E8F0;
+    --ring: #2563EB;
 
-  --radius: 10px;
-  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 10%);
+    --sidebar: #1E293B;
+    --sidebar-foreground: #F1F5F9;
+    --sidebar-muted: #94A3B8;
+    --sidebar-accent: #334155;
+    --sidebar-border: #334155;
+    /* Acento de marca: SOLO logo e ítem activo del sidebar */
+    --brand: #EA580C;
 
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--bg);
-  color-scheme: light dark;
-  -webkit-font-smoothing: antialiased;
+    --stock-ok: #16A34A;
+    --stock-ok-bg: #DCFCE7;
+    --stock-low: #B45309;
+    --stock-low-bg: #FEF3C7;
+    --stock-out: #DC2626;
+    --stock-out-bg: #FEE2E2;
+
+    --mov-ingreso: #16A34A;
+    --mov-ingreso-bg: #DCFCE7;
+    --mov-salida: #2563EB;
+    --mov-salida-bg: #DBEAFE;
+    --mov-ajuste: #475569;
+    --mov-ajuste-bg: #F1F5F9;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111418;
-    --surface: #1a1f25;
-    --border: #2b323b;
-    --text: #e6e9ed;
-    --text-muted: #9aa5b1;
-    --header-bg: #0b0e11;
-    --accent: #f76707;
-    --accent-hover: #ff7d24;
-
-    --ok: #4cc77f;
-    --ok-bg: #16301f;
-    --warn: #f0a63a;
-    --warn-bg: #33270f;
-    --error: #f2675f;
-    --error-bg: #3a1a18;
-    --pending: #9aa5b1;
-    --pending-bg: #242a31;
-
-    --shadow: 0 1px 3px rgb(0 0 0 / 40%);
-  }
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--bg);
-}
-
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-h1,
-h2,
-p {
-  margin: 0;
-}
-
-.container {
-  width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
-  padding-inline: 16px;
-}
-
-/* ---------- Encabezado ---------- */
-
-.topbar {
-  background: var(--header-bg);
-  color: var(--header-text);
-  border-bottom: 3px solid var(--accent);
-}
-
-.topbar__inner {
-  display: flex;
-  align-items: center;
-  min-height: 64px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.brand__logo {
-  width: 32px;
-  height: 32px;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-
-.brand__name {
-  display: block;
-  font-weight: 700;
-  font-size: 1.125rem;
-  letter-spacing: 0.01em;
-}
-
-.brand__tagline {
-  display: block;
-  font-size: 0.8125rem;
-  color: #aab4bf;
-}
-
-/* ---------- Contenido ---------- */
-
-.main {
-  flex: 1;
-  padding-block: 32px;
-}
-
-.page-heading {
-  margin-bottom: 24px;
-}
-
-.page-heading h1 {
-  font-size: 1.75rem;
-  line-height: 1.2;
-}
-
-.page-heading p {
-  margin-top: 4px;
-  color: var(--text-muted);
-}
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-/* ---------- Estado de conexión ---------- */
-
-.status {
-  --state: var(--pending);
-  --state-bg: var(--pending-bg);
-  max-width: 560px;
-  border-top: 4px solid var(--state);
-}
-
-.status--online {
-  --state: var(--ok);
-  --state-bg: var(--ok-bg);
-}
-
-.status--degraded {
-  --state: var(--warn);
-  --state-bg: var(--warn-bg);
-}
-
-.status--offline {
-  --state: var(--error);
-  --state-bg: var(--error-bg);
-}
-
-.status__header {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 20px 20px 16px;
-}
-
-.status__dot {
-  width: 14px;
-  height: 14px;
-  margin-top: 6px;
-  border-radius: 50%;
-  background: var(--state);
-  box-shadow: 0 0 0 5px var(--state-bg);
-  flex-shrink: 0;
-}
-
-.status--checking .status__dot {
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-
-.status__title {
-  font-size: 1.25rem;
-  line-height: 1.3;
-}
-
-.status__detail {
-  margin-top: 2px;
-  color: var(--text-muted);
-}
-
-.status__list {
-  list-style: none;
-  margin: 0;
-  padding: 0 20px;
-}
-
-.status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding-block: 12px;
-  border-top: 1px solid var(--border);
-}
-
-.status-row__name {
-  font-weight: 500;
-}
-
-.badge {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  padding: 2px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.badge--ok {
-  color: var(--ok);
-  background: var(--ok-bg);
-}
-
-.badge--error {
-  color: var(--error);
-  background: var(--error-bg);
-}
-
-.badge--pending {
-  color: var(--pending);
-  background: var(--pending-bg);
-}
-
-.status__footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--border);
-}
-
-.status__time {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
-.button {
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #fff;
-  background: var(--accent);
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-}
-
-.button:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-/* ---------- Pie ---------- */
-
-.page-footer {
-  padding-block: 20px;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    html {
+        @apply font-sans;
+    }
+    /* Escala base 14px (text-sm) sin achicar el resto de la escala rem de Tailwind */
+    body {
+        @apply bg-background text-sm text-foreground antialiased;
+    }
+    /* Cantidades alineadas en tablas */
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
 }
