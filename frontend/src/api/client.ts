@@ -18,10 +18,20 @@ const MENSAJES_POR_ESTADO: Record<number, string> = {
   503: 'El servicio no está disponible en este momento.',
 }
 
+// Token de la sesión actual. Lo setea AuthProvider al iniciar o cerrar sesión.
+let token: string | null = null
+let alExpirar: (() => void) | null = null
+
+export function configurarSesion(nuevoToken: string | null, onExpirada?: () => void) {
+  token = nuevoToken
+  if (onExpirada) alExpirar = onExpirada
+}
+
 /**
  * Llama a la API REST (`/api/...`, redirigido por Vite al backend).
- * Lanza ApiError con el `detail` del ProblemDetail cuando la respuesta no es 2xx,
- * o un ApiError(0) si no hay conexión o se supera el timeout.
+ * Si hay sesión, agrega `Authorization: Bearer <token>`. Lanza ApiError con el `detail`
+ * del ProblemDetail cuando la respuesta no es 2xx, o ApiError(0) si no hay conexión.
+ * Un 401 con sesión iniciada significa que el token venció: se cierra la sesión.
  */
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const timeout = AbortSignal.timeout(TIMEOUT_MS)
@@ -32,7 +42,11 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     res = await fetch(`/api${path}`, {
       ...init,
       signal,
-      headers: { 'Content-Type': 'application/json', ...init.headers },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
     })
   } catch (error) {
     // Cancelación externa (p. ej. al desmontar): se propaga tal cual
@@ -48,6 +62,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       // respuesta sin cuerpo JSON
     }
+    if (res.status === 401 && token && !path.startsWith('/auth/')) alExpirar?.()
     throw new ApiError(res.status, detail ?? MENSAJES_POR_ESTADO[res.status] ?? `Error ${res.status}`)
   }
 

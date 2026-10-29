@@ -1,38 +1,51 @@
 import { useState } from 'react'
 import { ArrowDown, CircleCheck, Package, TriangleAlert } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
-import { listarBajoStock } from '@/api/productos'
-import { listarProveedores } from '@/api/proveedores'
+import { listarAReponer, proveedoresDeProducto } from '@/api/productos'
+import type { EstadoStock, ProductoProveedor } from '@/api/types'
 import { StockBadge } from '@/components/badges'
 import { Aviso, CeldaProducto, ErrorCarga, EstadoVacio, SearchField, TablaCargando, Toolbar } from '@/components/common'
 import { useRegistrarMovimiento } from '@/components/dialogs/registrar-context'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useSesion } from '@/hooks/auth-context'
 import { useApi } from '@/hooks/useApi'
-import { fmtNumero, incluye } from '@/lib/format'
-import { estadoStock, faltante, porUrgencia } from '@/lib/stock'
+import { fmtNumero, fmtPrecio, incluye } from '@/lib/format'
+import { faltante, porUrgencia } from '@/lib/stock'
 
 const TODOS = 'todos'
 
 export function ReponerPage() {
   const navigate = useNavigate()
+  const { sucursal } = useSesion()
   const abrirMovimiento = useRegistrarMovimiento()
-  const productos = useApi((signal) => listarBajoStock(signal))
-  const proveedores = useApi((signal) => listarProveedores(signal))
+  // Cada fila trae su proveedor preferido (si tiene) para sugerir a quién comprar
+  const filas = useApi(
+    async (signal) => {
+      const lista = await listarAReponer(sucursal.id, signal)
+      return Promise.all(
+        lista.map(async (s) => {
+          const proveedores = await proveedoresDeProducto(s.productoId, signal)
+          return { ...s, preferido: proveedores.find((p) => p.preferido) as ProductoProveedor | undefined }
+        }),
+      )
+    },
+    [sucursal.id],
+  )
   const [busqueda, setBusqueda] = useState('')
-  const [proveedor, setProveedor] = useState(TODOS)
+  const [estado, setEstado] = useState<EstadoStock | typeof TODOS>(TODOS)
 
-  if (productos.error) return <ErrorCarga error={productos.error} onRetry={productos.reload} />
-  if (!productos.data) return <TablaCargando filas={6} columnas={7} />
+  if (filas.error) return <ErrorCarga error={filas.error} onRetry={filas.reload} />
+  if (!filas.data) return <TablaCargando filas={6} columnas={7} />
 
-  if (productos.data.length === 0)
+  if (filas.data.length === 0)
     return (
       <EstadoVacio
         icon={CircleCheck}
         tono="ok"
         titulo="Todo en orden"
-        descripcion="No hay productos en o por debajo del stock mínimo."
+        descripcion={`No hay productos en o por debajo del punto de pedido en ${sucursal.nombre}.`}
         accion={
           <Button variant="outline" asChild>
             <Link to="/productos">
@@ -43,30 +56,26 @@ export function ReponerPage() {
       />
     )
 
-  const lista = [...productos.data]
-    .filter((p) => !busqueda || incluye(p.codigo, busqueda) || incluye(p.descripcion, busqueda))
-    .filter((p) => proveedor === TODOS || String(p.proveedorId) === proveedor)
+  const lista = [...filas.data]
+    .filter((s) => !busqueda || incluye(s.codigo, busqueda) || incluye(s.nombre, busqueda))
+    .filter((s) => estado === TODOS || s.estado === estado)
     .sort(porUrgencia)
-  const prov = (id: number | null) => proveedores.data?.find((p) => p.id === id)
 
   return (
     <>
-      <Aviso icon={TriangleAlert} tono="bajo" titulo={`${productos.data.length} productos están en o por debajo del stock mínimo`}>
-        Ordenados por urgencia: primero sin stock, luego por faltante.
+      <Aviso icon={TriangleAlert} tono="bajo" titulo={`${filas.data.length} productos están en o por debajo del punto de pedido`}>
+        Ordenados por urgencia: primero los críticos (en o por debajo del mínimo), luego por faltante.
       </Aviso>
       <Toolbar>
-        <SearchField value={busqueda} onChange={setBusqueda} placeholder="Buscar por código o descripción" />
-        <Select value={proveedor} onValueChange={setProveedor}>
-          <SelectTrigger className="w-64" aria-label="Filtrar por proveedor">
+        <SearchField value={busqueda} onChange={setBusqueda} placeholder="Buscar por código o nombre" />
+        <Select value={estado} onValueChange={(v) => setEstado(v as EstadoStock)}>
+          <SelectTrigger className="w-44" aria-label="Filtrar por estado">
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="popper">
-            <SelectItem value={TODOS}>Proveedor: Todos</SelectItem>
-            {proveedores.data?.map((p) => (
-              <SelectItem key={p.id} value={String(p.id)}>
-                {p.razonSocial}
-              </SelectItem>
-            ))}
+            <SelectItem value={TODOS}>Estado: Todos</SelectItem>
+            <SelectItem value="CRITICO">Crítico</SelectItem>
+            <SelectItem value="REPONER">A reponer</SelectItem>
           </SelectContent>
         </Select>
       </Toolbar>
@@ -76,46 +85,50 @@ export function ReponerPage() {
           <TableHeader className="bg-muted">
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-4 text-muted-foreground">Producto</TableHead>
-              <TableHead className="text-muted-foreground">Proveedor</TableHead>
+              <TableHead className="text-muted-foreground">Proveedor preferido</TableHead>
               <TableHead className="text-right text-muted-foreground">Stock</TableHead>
-              <TableHead className="text-right text-muted-foreground">Mínimo</TableHead>
+              <TableHead className="text-right text-muted-foreground">Mín. / Pto. pedido</TableHead>
               <TableHead className="text-right text-muted-foreground">Faltante</TableHead>
               <TableHead className="text-muted-foreground">Estado</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {lista.map((p) => {
-              const pr = prov(p.proveedorId)
-              return (
-                <TableRow key={p.id} className="h-15 cursor-pointer" onClick={() => navigate(`/productos/${p.id}`)}>
-                  <TableCell className="pl-4">
-                    <CeldaProducto descripcion={p.descripcion} codigo={p.codigo} />
-                  </TableCell>
-                  <TableCell>
-                    <p>{pr?.razonSocial ?? '—'}</p>
-                    {pr?.telefono && <p className="text-[13px] text-muted-foreground">{pr.telefono}</p>}
-                  </TableCell>
-                  <TableCell className="tabular text-right font-medium">{fmtNumero(p.stockActual)}</TableCell>
-                  <TableCell className="tabular text-right text-muted-foreground">{fmtNumero(p.stockMinimo)}</TableCell>
-                  <TableCell className="tabular text-right font-medium">{fmtNumero(faltante(p))}</TableCell>
-                  <TableCell>
-                    <StockBadge estado={estadoStock(p)} />
-                  </TableCell>
-                  <TableCell className="pr-4 text-right">
-                    <Button
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        abrirMovimiento({ productoId: p.id, tipo: 'ENTRADA', cantidad: faltante(p) || undefined })
-                      }}
-                    >
-                      <ArrowDown /> Registrar ingreso
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
+            {lista.map((s) => (
+              <TableRow key={s.productoId} className="h-15 cursor-pointer" onClick={() => navigate(`/productos/${s.productoId}`)}>
+                <TableCell className="pl-4">
+                  <CeldaProducto descripcion={s.nombre} codigo={s.codigo} />
+                </TableCell>
+                <TableCell>
+                  <p>{s.preferido?.razonSocial ?? '—'}</p>
+                  {s.preferido?.precioCosto != null && <p className="text-[13px] text-muted-foreground">Costo {fmtPrecio(s.preferido.precioCosto)}</p>}
+                </TableCell>
+                <TableCell className="tabular text-right font-medium">{fmtNumero(s.cantidad)}</TableCell>
+                <TableCell className="tabular text-right text-muted-foreground">
+                  {fmtNumero(s.stockMinimo)} / {fmtNumero(s.puntoPedido)}
+                </TableCell>
+                <TableCell className="tabular text-right font-medium">{fmtNumero(faltante(s))}</TableCell>
+                <TableCell>
+                  <StockBadge estado={s.estado} />
+                </TableCell>
+                <TableCell className="pr-4 text-right">
+                  <Button
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      abrirMovimiento({
+                        productoId: s.productoId,
+                        tipo: 'INGRESO_COMPRA',
+                        cantidad: faltante(s) || undefined,
+                        proveedorId: s.preferido?.proveedorId,
+                      })
+                    }}
+                  >
+                    <ArrowDown /> Registrar compra
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
             {lista.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">

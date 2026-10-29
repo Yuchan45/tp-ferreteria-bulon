@@ -5,6 +5,7 @@ export interface PresetMovimiento {
   productoId?: number
   tipo?: TipoMovimiento
   cantidad?: number
+  proveedorId?: number
 }
 
 /** Abre el diálogo global "Registrar movimiento" (vive en AppLayout). */

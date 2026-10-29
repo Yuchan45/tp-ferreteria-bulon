@@ -15,3 +15,6 @@ app:
   seed:
     # Ignora SEED_ENABLED del .env; DataSeederTests lo activa explícitamente
     enabled: false
+  jwt:
+    # Clave fija solo para los tests (en desarrollo se usa JWT_SECRET del .env)
+    secret: clave-de-prueba-solo-para-tests-0123456789abcdef

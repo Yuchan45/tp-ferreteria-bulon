@@ -40,11 +40,14 @@ En desarrollo, Vite redirige las llamadas a `/api` hacia el backend, por lo que 
 ferreteria-bulon/
 ├── backend/                     # API REST (Spring Boot)
 │   ├── src/main/java/com/bulon/stock/
-│   │   ├── productos/           # Catálogo y stock mínimo
-│   │   ├── movimientos/         # Entradas, salidas y ajustes de stock
+│   │   ├── sucursales/          # Sucursales con stock
+│   │   ├── categorias/
+│   │   ├── productos/           # Catálogo y proveedores de cada producto
+│   │   ├── stock/               # Stock por sucursal y reposición
+│   │   ├── movimientos/         # Compras, ventas, devoluciones, roturas y ajustes
 │   │   ├── proveedores/
 │   │   ├── usuarios/            # Usuarios y roles
-│   │   ├── common/exception/    # Manejo global de errores
+│   │   ├── common/              # Errores globales, auditoría, contraseñas
 │   │   └── seed/                # Datos de ejemplo para desarrollo
 │   └── src/main/resources/
 │       ├── application.yml
@@ -82,14 +85,14 @@ Levanta SQL Server en `localhost:1433` y crea la base `bulon_stock`. Las tablas 
 
 ```bash
 cd backend
-cp .env.example .env      # completar DB_PASSWORD (por defecto: Bulon_Dev_2026!)
+cp .env.example .env      # completar DB_PASSWORD (por defecto: Bulon_Dev_2026!) y JWT_SECRET
 ./mvnw spring-boot:run    # en Windows: .\mvnw.cmd spring-boot:run
 ```
 
 - API en `http://localhost:8080/api`
 - Estado del sistema: `http://localhost:8080/api/health`
-- Con `SEED_ENABLED=true` en el `.env`, la primera vez carga datos de ejemplo: 3 usuarios,
-  5 proveedores y 25 productos de ferretería.
+- Con `SEED_ENABLED=true` en el `.env`, la primera vez carga datos de ejemplo: 1 sucursal,
+  3 usuarios (contraseña `bulon1234`), 6 proveedores y 27 productos de ferretería.
 
 ### 3. Frontend
 
@@ -99,7 +102,11 @@ npm install
 npm run dev               # http://localhost:5173
 ```
 
-El panel muestra si el sistema está conectado al backend y a la base de datos.
+Se entra con `admin` / `bulon1234` (administrador) o `ventas` / `bulon1234` (empleado), o
+creando una cuenta en `/registro` (siempre como empleado). El menú y los botones de alta se
+adaptan al rol, pero la seguridad real la aplica el backend.
+
+Si el backend corre en otro puerto: `BACKEND_URL=http://localhost:8081 npm run dev`.
 
 ### Tests
 
@@ -113,15 +120,20 @@ cd frontend && npm run build && npm run lint
 | Método   | Ruta                           | Descripción                          |
 |----------|--------------------------------|--------------------------------------|
 | GET      | `/api/health`                  | Estado de la API y de la base        |
+| POST     | `/api/auth/login`, `/api/auth/registro` | Iniciar sesión / crear cuenta (devuelven un JWT) |
+| GET      | `/api/sucursales`              | Sucursales                           |
 | GET/POST | `/api/productos`               | Listar / crear productos             |
 | GET/PUT  | `/api/productos/{id}`          | Ver / actualizar un producto         |
+| GET      | `/api/productos/{id}/stock`    | Stock del producto por sucursal      |
 | GET      | `/api/productos/bajo-stock`    | Productos que hay que reponer        |
 | GET      | `/api/movimientos?productoId=` | Historial de movimientos             |
-| POST     | `/api/movimientos`             | Registrar entrada, salida o ajuste   |
+| POST     | `/api/movimientos`             | Registrar compra, venta, devolución, rotura o ajuste |
 | GET/POST | `/api/proveedores`             | Listar / crear proveedores           |
 | GET/POST | `/api/usuarios`                | Listar / crear usuarios              |
 
-Listado completo y reglas de negocio en el [README del backend](backend/README.md).
+Salvo `health`, `auth` y `sucursales`, todos exigen token; las altas y cambios de catálogo,
+proveedores y usuarios son solo para `ADMINISTRADOR`. Listado completo, permisos por endpoint y
+reglas de negocio en el [README del backend](backend/README.md).
 
 ## Patrones de diseño
 

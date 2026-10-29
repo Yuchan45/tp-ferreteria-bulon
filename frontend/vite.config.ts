@@ -5,8 +5,9 @@ import { defineConfig } from 'vite'
 
 // Las llamadas a /api se redirigen al backend Spring Boot, así el navegador
 // las ve como del mismo origen y no hace falta configurar CORS.
+// BACKEND_URL permite apuntar a otro puerto (por defecto 8080).
 const apiProxy = {
-  '/api': 'http://localhost:8080',
+  '/api': process.env.BACKEND_URL ?? 'http://localhost:8080',
 }
 
 // https://vite.dev/config/

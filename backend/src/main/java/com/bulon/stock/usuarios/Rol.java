@@ -1,7 +1,8 @@
 package com.bulon.stock.usuarios;
 
 public enum Rol {
+    /** Todo el sistema y todas las sucursales. */
     ADMINISTRADOR,
-    ENCARGADO_DEPOSITO,
-    VENDEDOR
+    /** Opera el stock de su sucursal. */
+    EMPLEADO
 }

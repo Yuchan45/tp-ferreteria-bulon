@@ -7,6 +7,7 @@ import { CeldaProducto, ErrorCarga, EstadoVacio, POR_PAGINA, Paginacion, SearchF
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useSesion } from '@/hooks/auth-context'
 import { useMovimientosGlobales } from '@/hooks/useMovimientosGlobales'
 import { TIPO_LABEL, diaLocal, fmtDelta, fmtFechaHora, fmtNumero, incluye } from '@/lib/format'
 import { delta } from '@/lib/stock'
@@ -14,7 +15,8 @@ import { delta } from '@/lib/stock'
 const TODOS = 'todos'
 
 export function MovimientosPage() {
-  const movimientos = useMovimientosGlobales()
+  const { sucursal } = useSesion()
+  const movimientos = useMovimientosGlobales(sucursal.id)
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
   const [tipo, setTipo] = useState<TipoMovimiento | typeof TODOS>(TODOS)
@@ -27,7 +29,7 @@ export function MovimientosPage() {
       (!desde || dia >= desde) &&
       (!hasta || dia <= hasta) &&
       (tipo === TODOS || m.tipo === tipo) &&
-      (!busqueda || incluye(m.producto.codigo, busqueda) || incluye(m.producto.descripcion, busqueda))
+      (!busqueda || incluye(m.producto.codigo, busqueda) || incluye(m.producto.nombre, busqueda))
     )
   })
   const visibles = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
@@ -45,7 +47,7 @@ export function MovimientosPage() {
           <Input type="date" aria-label="Hasta" value={hasta} min={desde || undefined} onChange={(e) => filtrar(setHasta)(e.target.value)} className="w-40" />
         </div>
         <Select value={tipo} onValueChange={filtrar((v: string) => setTipo(v as TipoMovimiento))}>
-          <SelectTrigger className="w-40" aria-label="Filtrar por tipo">
+          <SelectTrigger className="w-52" aria-label="Filtrar por tipo">
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="popper">
@@ -79,7 +81,7 @@ export function MovimientosPage() {
                   <TableHead className="text-muted-foreground">Tipo</TableHead>
                   <TableHead className="text-right text-muted-foreground">Cantidad</TableHead>
                   <TableHead className="text-right text-muted-foreground">Stock resultante</TableHead>
-                  <TableHead className="text-muted-foreground">Observación</TableHead>
+                  <TableHead className="text-muted-foreground">Detalle</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -87,8 +89,8 @@ export function MovimientosPage() {
                   <TableRow key={m.id} className="h-13">
                     <TableCell className="pl-4 text-muted-foreground">{fmtFechaHora(m.fecha)}</TableCell>
                     <TableCell>
-                      <Link to={`/productos/${m.producto.id}`} className="hover:underline">
-                        <CeldaProducto descripcion={m.producto.descripcion} codigo={m.producto.codigo} peso="normal" />
+                      <Link to={`/productos/${m.productoId}`} className="hover:underline">
+                        <CeldaProducto descripcion={m.producto.nombre} codigo={m.producto.codigo} peso="normal" />
                       </Link>
                     </TableCell>
                     <TableCell>
@@ -96,7 +98,7 @@ export function MovimientosPage() {
                     </TableCell>
                     <TableCell className="tabular text-right font-medium">{fmtDelta(delta(m.tipo, m.cantidad))}</TableCell>
                     <TableCell className="tabular text-right">{fmtNumero(m.stockResultante)}</TableCell>
-                    <TableCell className="max-w-60 truncate text-muted-foreground">{m.observacion ?? '—'}</TableCell>
+                    <TableCell className="max-w-60 truncate text-muted-foreground">{[m.motivo ?? m.observaciones, m.referencia].filter(Boolean).join(' · ') || '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

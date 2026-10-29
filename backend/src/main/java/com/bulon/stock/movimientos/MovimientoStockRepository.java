@@ -6,5 +6,7 @@ import java.util.List;
 
 public interface MovimientoStockRepository extends JpaRepository<MovimientoStock, Long> {
 
-    List<MovimientoStock> findByProductoIdOrderByFechaDesc(Long productoId);
+    List<MovimientoStock> findByProductoIdOrderByFechaDescIdDesc(Long productoId);
+
+    List<MovimientoStock> findByProductoIdAndSucursalIdOrderByFechaDescIdDesc(Long productoId, Long sucursalId);
 }

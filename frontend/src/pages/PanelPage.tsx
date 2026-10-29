@@ -1,39 +1,41 @@
 import { ChevronRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
-import { listarProductos } from '@/api/productos'
+import { listarStock } from '@/api/catalogo'
 import { MovimientoBadge, StockBadge } from '@/components/badges'
 import { CeldaProducto, ErrorCarga, EstadoVacio, KpiCard, Seccion } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useSesion } from '@/hooks/auth-context'
 import { useApi } from '@/hooks/useApi'
 import { useMovimientosGlobales } from '@/hooks/useMovimientosGlobales'
 import { esHoy, fmtDelta, fmtHora, fmtNumero } from '@/lib/format'
-import { delta, estadoStock, faltante, porUrgencia } from '@/lib/stock'
+import { delta, faltante, porUrgencia } from '@/lib/stock'
 
 export function PanelPage() {
   const navigate = useNavigate()
-  const productos = useApi((signal) => listarProductos(signal))
-  const movimientos = useMovimientosGlobales()
+  const { sucursal } = useSesion()
+  const stock = useApi((signal) => listarStock(sucursal.id, signal), [sucursal.id])
+  const movimientos = useMovimientosGlobales(sucursal.id)
 
-  if (productos.error) return <ErrorCarga error={productos.error} onRetry={productos.reload} />
+  if (stock.error) return <ErrorCarga error={stock.error} onRetry={stock.reload} />
 
-  const lista = productos.data ?? []
-  const bajos = lista.filter((p) => estadoStock(p) === 'BAJO').length
-  const sinStock = lista.filter((p) => estadoStock(p) === 'SIN_STOCK').length
-  const aReponer = lista.filter((p) => estadoStock(p) !== 'OK').sort(porUrgencia)
+  const lista = stock.data ?? []
+  const aReponer = lista.filter((s) => s.estado === 'REPONER').length
+  const criticos = lista.filter((s) => s.estado === 'CRITICO').length
+  const alertas = lista.filter((s) => s.estado !== 'OK').sort(porUrgencia)
   const hoy = (movimientos.data ?? []).filter((m) => esHoy(m.fecha))
-  const ingresosHoy = hoy.filter((m) => m.tipo === 'ENTRADA').length
-  const salidasHoy = hoy.filter((m) => m.tipo === 'SALIDA').length
-  const cargando = productos.loading && !productos.data
+  const ingresosHoy = hoy.filter((m) => delta(m.tipo, m.cantidad) > 0).length
+  const salidasHoy = hoy.filter((m) => delta(m.tipo, m.cantidad) < 0).length
+  const cargando = stock.loading && !stock.data
   const valor = (n: number) => (cargando ? <Skeleton className="h-9 w-14 bg-muted" /> : fmtNumero(n))
 
   return (
     <>
       <div className="grid grid-cols-4 gap-4">
-        <KpiCard titulo="Productos activos" valor={valor(lista.length)} detalle="En catálogo" />
-        <KpiCard tono="bajo" titulo="Stock bajo" valor={valor(bajos)} detalle="En o por debajo del mínimo" />
-        <KpiCard tono="sin-stock" titulo="Sin stock" valor={valor(sinStock)} detalle="Reposición urgente" />
+        <KpiCard titulo="Productos" valor={valor(lista.length)} detalle={sucursal.nombre} />
+        <KpiCard tono="bajo" titulo="A reponer" valor={valor(aReponer)} detalle="En o por debajo del punto de pedido" />
+        <KpiCard tono="sin-stock" titulo="Críticos" valor={valor(criticos)} detalle="En o por debajo del mínimo" />
         <KpiCard
           tono="primario"
           titulo="Movimientos del día"
@@ -53,30 +55,30 @@ export function PanelPage() {
             </Button>
           }
         >
-          {!cargando && aReponer.length === 0 ? (
-            <p className="py-6 text-center text-muted-foreground">No hay productos en o por debajo del stock mínimo.</p>
+          {!cargando && alertas.length === 0 ? (
+            <p className="py-6 text-center text-muted-foreground">No hay productos en o por debajo del punto de pedido.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="pl-0 text-muted-foreground">Producto</TableHead>
                   <TableHead className="text-right text-muted-foreground">Stock</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Mínimo</TableHead>
+                  <TableHead className="text-right text-muted-foreground">Pto. pedido</TableHead>
                   <TableHead className="text-right text-muted-foreground">Faltante</TableHead>
                   <TableHead className="text-muted-foreground">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {aReponer.slice(0, 5).map((p) => (
-                  <TableRow key={p.id} className="h-13 cursor-pointer" onClick={() => navigate(`/productos/${p.id}`)}>
+                {alertas.slice(0, 5).map((s) => (
+                  <TableRow key={s.productoId} className="h-13 cursor-pointer" onClick={() => navigate(`/productos/${s.productoId}`)}>
                     <TableCell className="pl-0">
-                      <CeldaProducto descripcion={p.descripcion} codigo={p.codigo} />
+                      <CeldaProducto descripcion={s.nombre} codigo={s.codigo} />
                     </TableCell>
-                    <TableCell className="tabular text-right font-medium">{fmtNumero(p.stockActual)}</TableCell>
-                    <TableCell className="tabular text-right">{fmtNumero(p.stockMinimo)}</TableCell>
-                    <TableCell className="tabular text-right font-medium">{fmtNumero(faltante(p))}</TableCell>
+                    <TableCell className="tabular text-right font-medium">{fmtNumero(s.cantidad)}</TableCell>
+                    <TableCell className="tabular text-right">{fmtNumero(s.puntoPedido)}</TableCell>
+                    <TableCell className="tabular text-right font-medium">{fmtNumero(faltante(s))}</TableCell>
                     <TableCell>
-                      <StockBadge estado={estadoStock(p)} />
+                      <StockBadge estado={s.estado} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -95,8 +97,8 @@ export function PanelPage() {
               {(movimientos.data ?? []).slice(0, 6).map((m) => (
                 <li key={m.id} className="flex items-center gap-3 py-3">
                   <MovimientoBadge tipo={m.tipo} />
-                  <Link to={`/productos/${m.producto.id}`} className="min-w-0 flex-1 hover:underline">
-                    <p className="truncate">{m.producto.descripcion}</p>
+                  <Link to={`/productos/${m.productoId}`} className="min-w-0 flex-1 hover:underline">
+                    <p className="truncate">{m.producto.nombre}</p>
                     <p className="text-[13px] text-muted-foreground">
                       {m.producto.codigo} · {esHoy(m.fecha) ? fmtHora(m.fecha) : new Date(m.fecha).toLocaleDateString('es-AR')}
                     </p>

@@ -59,6 +59,10 @@
     --color-mov-salida-bg: var(--mov-salida-bg);
     --color-mov-ajuste: var(--mov-ajuste);
     --color-mov-ajuste-bg: var(--mov-ajuste-bg);
+    --color-mov-devolucion: var(--mov-devolucion);
+    --color-mov-devolucion-bg: var(--mov-devolucion-bg);
+    --color-mov-rotura: var(--mov-rotura);
+    --color-mov-rotura-bg: var(--mov-rotura-bg);
 
     --radius-sm: calc(var(--radius) * 0.5);
     --radius-md: calc(var(--radius) * 0.75);
@@ -112,6 +116,10 @@
     --mov-salida-bg: #DBEAFE;
     --mov-ajuste: #475569;
     --mov-ajuste-bg: #F1F5F9;
+    --mov-devolucion: #7C3AED;
+    --mov-devolucion-bg: #EDE9FE;
+    --mov-rotura: #DC2626;
+    --mov-rotura-bg: #FEE2E2;
 }
 
 @layer base {

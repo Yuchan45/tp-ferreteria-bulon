@@ -18,6 +18,7 @@ export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const [cuit, setCuit] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
+  const [contacto, setContacto] = useState('')
   const [intentado, setIntentado] = useState(false)
   const [errorServidor, setErrorServidor] = useState<string>()
   const [enviando, setEnviando] = useState(false)
@@ -40,13 +41,14 @@ export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenC
         cuit: cuit.trim() || null,
         telefono: telefono.trim() || null,
         email: email.trim() || null,
+        contacto: contacto.trim() || null,
       })
       toast.success('Proveedor creado', { description: p.razonSocial })
       invalidate()
       onOpenChange(false)
     } catch (e) {
-      // Un CUIT repetido viola el índice único y el backend responde 500 sin detalle
-      setErrorServidor(e instanceof ApiError && e.status === 500 ? 'No se pudo guardar. Verificá que el CUIT no esté cargado en otro proveedor.' : (e as Error).message)
+      // Un CUIT repetido viola el índice único: el backend responde 409
+      setErrorServidor(e instanceof ApiError && e.status === 409 ? 'No se pudo guardar. Verificá que el CUIT no esté cargado en otro proveedor.' : (e as Error).message)
     } finally {
       setEnviando(false)
     }
@@ -81,9 +83,14 @@ export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenC
           <Input id="prov-tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="011 4655-6600" />
         </Campo>
       </div>
-      <Campo label="Email" htmlFor="prov-mail" error={err('email')}>
-        <Input id="prov-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ventas@proveedor.com.ar" aria-invalid={!!err('email')} />
-      </Campo>
+      <div className="grid grid-cols-2 items-start gap-4">
+        <Campo label="Email" htmlFor="prov-mail" error={err('email')}>
+          <Input id="prov-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ventas@proveedor.com.ar" aria-invalid={!!err('email')} />
+        </Campo>
+        <Campo label="Contacto" htmlFor="prov-contacto">
+          <Input id="prov-contacto" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Nombre de la persona" />
+        </Campo>
+      </div>
       <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
         <Info className="size-4 text-primary" /> El CUIT es opcional, pero si se carga debe ser único.
       </p>

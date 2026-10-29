@@ -32,6 +32,11 @@ app:
   seed:
     # Carga datos de ejemplo de la ferretería si las tablas están vacías (solo desarrollo)
     enabled: ${SEED_ENABLED:false}
+  jwt:
+    # Clave para firmar los tokens (HS256, mínimo 32 bytes). Se define en backend/.env
+    secret: ${JWT_SECRET}
+    # Duración de la sesión: una jornada de trabajo
+    expiracion-horas: 8
 
 management:
   endpoints:

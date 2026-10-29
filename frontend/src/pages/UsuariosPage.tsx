@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Users } from 'lucide-react'
+import { listarSucursales } from '@/api/catalogo'
 import type { Rol } from '@/api/types'
 import { listarUsuarios } from '@/api/usuarios'
 import { ErrorCarga, EstadoVacio, SearchField, TablaCargando, Toolbar } from '@/components/common'
@@ -15,6 +16,7 @@ const TODOS = 'todos'
 
 export function UsuariosPage() {
   const usuarios = useApi((signal) => listarUsuarios(signal))
+  const sucursales = useApi((signal) => listarSucursales(signal))
   const [busqueda, setBusqueda] = useState('')
   const [rol, setRol] = useState<Rol | typeof TODOS>(TODOS)
   const [nuevo, setNuevo] = useState(0)
@@ -22,6 +24,8 @@ export function UsuariosPage() {
   const lista = (usuarios.data ?? [])
     .filter((u) => !busqueda || incluye(u.nombre, busqueda) || incluye(u.username, busqueda))
     .filter((u) => rol === TODOS || u.rol === rol)
+  // El administrador no tiene sucursal asignada: opera todas
+  const nombreSucursal = (id: number | null) => (id == null ? 'Todas' : (sucursales.data?.find((s) => s.id === id)?.nombre ?? '…'))
 
   return (
     <>
@@ -49,7 +53,7 @@ export function UsuariosPage() {
       {usuarios.error ? (
         <ErrorCarga error={usuarios.error} onRetry={usuarios.reload} />
       ) : !usuarios.data ? (
-        <TablaCargando filas={4} columnas={3} />
+        <TablaCargando filas={4} columnas={5} />
       ) : lista.length === 0 ? (
         <EstadoVacio icon={Users} titulo="No hay usuarios" descripcion="Ningún usuario coincide con los filtros." />
       ) : (
@@ -58,7 +62,9 @@ export function UsuariosPage() {
             <TableHeader className="bg-muted">
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4 text-muted-foreground">Usuario</TableHead>
+                <TableHead className="text-muted-foreground">Email</TableHead>
                 <TableHead className="text-muted-foreground">Rol</TableHead>
+                <TableHead className="text-muted-foreground">Sucursal</TableHead>
                 <TableHead className="pr-4 text-muted-foreground">Estado</TableHead>
               </TableRow>
             </TableHeader>
@@ -74,9 +80,11 @@ export function UsuariosPage() {
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell className="text-muted-foreground">{u.email ?? '—'}</TableCell>
                   <TableCell>
                     <span className="rounded-md border bg-muted px-2 py-0.5 text-[13px] font-medium">{ROL_LABEL[u.rol]}</span>
                   </TableCell>
+                  <TableCell className="text-muted-foreground">{nombreSucursal(u.sucursalId)}</TableCell>
                   <TableCell className="pr-4">
                     <span className={cn('flex items-center gap-1.5', !u.activo && 'text-muted-foreground')}>
                       <span className={cn('size-2 rounded-full', u.activo ? 'bg-stock-ok' : 'bg-muted-foreground')} aria-hidden />

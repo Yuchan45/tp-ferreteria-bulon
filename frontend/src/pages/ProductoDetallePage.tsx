@@ -1,35 +1,37 @@
 import { useState } from 'react'
-import { ChevronRight, Mail, Pencil, Phone, Plus } from 'lucide-react'
+import { ChevronRight, Pencil, Plus } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { listarMovimientos } from '@/api/movimientos'
-import { obtenerProducto } from '@/api/productos'
-import { listarProveedores } from '@/api/proveedores'
+import { obtenerProducto, proveedoresDeProducto, stockDeProducto } from '@/api/productos'
 import { MovimientoBadge, StockBadge } from '@/components/badges'
 import { ErrorCarga, KpiCard, Seccion, TablaCargando } from '@/components/common'
 import { ProductoDialog } from '@/components/dialogs/ProductoDialog'
 import { useRegistrarMovimiento } from '@/components/dialogs/registrar-context'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useSesion } from '@/hooks/auth-context'
 import { useApi } from '@/hooks/useApi'
-import { fmtDelta, fmtFechaHora, fmtNumero, fmtPrecio } from '@/lib/format'
-import { conStockResultante, delta, estadoStock } from '@/lib/stock'
+import { TIPO_LABEL, UNIDAD_LABEL, fmtDelta, fmtFechaHora, fmtNumero, fmtPrecio } from '@/lib/format'
+import { conStockResultante, delta } from '@/lib/stock'
 
 export function ProductoDetallePage() {
   const id = Number(useParams().id)
+  const { sucursal, esAdmin } = useSesion()
   const abrirMovimiento = useRegistrarMovimiento()
   const producto = useApi((signal) => obtenerProducto(id, signal), [id])
-  const movimientos = useApi((signal) => listarMovimientos(id, signal), [id])
-  const proveedores = useApi((signal) => listarProveedores(signal))
+  const stock = useApi((signal) => stockDeProducto(id, signal), [id])
+  const proveedores = useApi((signal) => proveedoresDeProducto(id, signal), [id])
+  const movimientos = useApi((signal) => listarMovimientos(id, sucursal.id, signal), [id, sucursal.id])
   const [editar, setEditar] = useState(0)
 
   if (producto.error) return <ErrorCarga error={producto.error} onRetry={producto.reload} />
   if (!producto.data) return <TablaCargando filas={5} />
 
   const p = producto.data
-  const estado = estadoStock(p)
-  const proveedor = proveedores.data?.find((pr) => pr.id === p.proveedorId)
-  const historial = movimientos.data ? conStockResultante(movimientos.data, p.stockActual) : undefined
-  const diferencia = p.stockActual - p.stockMinimo
+  const fila = stock.data?.find((s) => s.sucursalId === sucursal.id)
+  const preferido = proveedores.data?.find((pr) => pr.preferido)
+  const historial = movimientos.data && fila ? conStockResultante(movimientos.data, fila.cantidad) : undefined
+  const sobrePedido = fila ? fila.cantidad - fila.puntoPedido : 0
 
   return (
     <>
@@ -45,13 +47,16 @@ export function ProductoDetallePage() {
         <div className="flex-1">
           <p className="font-mono text-[13px] text-muted-foreground">{p.codigo}</p>
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-semibold">{p.descripcion}</h2>
-            <StockBadge estado={estado} />
+            <h2 className="text-2xl font-semibold">{p.nombre}</h2>
+            {fila && <StockBadge estado={fila.estado} />}
           </div>
+          {p.descripcion && <p className="text-muted-foreground">{p.descripcion}</p>}
         </div>
-        <Button variant="outline" onClick={() => setEditar((n) => n + 1)}>
-          <Pencil /> Editar
-        </Button>
+        {esAdmin && (
+          <Button variant="outline" onClick={() => setEditar((n) => n + 1)} disabled={!stock.data || !proveedores.data}>
+            <Pencil /> Editar
+          </Button>
+        )}
         <Button onClick={() => abrirMovimiento({ productoId: p.id })}>
           <Plus /> Registrar movimiento
         </Button>
@@ -59,37 +64,50 @@ export function ProductoDetallePage() {
 
       <div className="grid grid-cols-4 items-stretch gap-4">
         <KpiCard
-          tono={estado === 'OK' ? 'ok' : estado === 'BAJO' ? 'bajo' : 'sin-stock'}
-          titulo="Stock actual"
-          valor={fmtNumero(p.stockActual)}
-          detalle={diferencia > 0 ? `${fmtNumero(diferencia)} por encima del mínimo` : diferencia === 0 ? 'Justo en el mínimo' : `${fmtNumero(-diferencia)} unidades por debajo del mínimo`}
+          tono={!fila ? 'neutral' : fila.estado === 'OK' ? 'ok' : fila.estado === 'REPONER' ? 'bajo' : 'sin-stock'}
+          titulo={`Stock · ${sucursal.nombre}`}
+          valor={fila ? fmtNumero(fila.cantidad) : '—'}
+          detalle={
+            !fila
+              ? UNIDAD_LABEL[p.unidadMedida]
+              : sobrePedido > 0
+                ? `${fmtNumero(sobrePedido)} por encima del punto de pedido`
+                : sobrePedido === 0
+                  ? 'Justo en el punto de pedido'
+                  : `${fmtNumero(-sobrePedido)} por debajo del punto de pedido`
+          }
         />
-        <KpiCard titulo="Stock mínimo" valor={fmtNumero(p.stockMinimo)} detalle="Umbral de reposición" />
-        <KpiCard titulo="Precio" valor={fmtPrecio(p.precio)} detalle="Por unidad" />
+        <KpiCard
+          titulo="Mínimo / Pto. pedido"
+          valor={fila ? `${fmtNumero(fila.stockMinimo)} / ${fmtNumero(fila.puntoPedido)}` : '—'}
+          detalle={`Total en todas las sucursales: ${fmtNumero(p.stockTotal)}`}
+        />
+        <KpiCard titulo="Precio" valor={fmtPrecio(p.precio)} detalle={`Por ${UNIDAD_LABEL[p.unidadMedida].toLowerCase()}`} />
         <div className="flex flex-col gap-2 rounded-lg border bg-card p-5">
-          <p className="text-[13px] font-medium text-muted-foreground">Proveedor</p>
-          {proveedor ? (
+          <p className="text-[13px] font-medium text-muted-foreground">Proveedor preferido</p>
+          {!proveedores.data ? (
+            <p className="text-muted-foreground">Cargando…</p>
+          ) : preferido ? (
             <>
-              <p className="font-medium">{proveedor.razonSocial}</p>
-              {proveedor.telefono && (
-                <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                  <Phone className="size-3.5" /> {proveedor.telefono}
-                </p>
-              )}
-              {proveedor.email && (
-                <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                  <Mail className="size-3.5" /> {proveedor.email}
+              <p className="font-medium">{preferido.razonSocial}</p>
+              <p className="text-[13px] text-muted-foreground">
+                Costo {fmtPrecio(preferido.precioCosto)}
+                {preferido.plazoEntregaDias != null && ` · entrega en ${preferido.plazoEntregaDias} días`}
+              </p>
+              {proveedores.data.length > 1 && (
+                <p className="text-[13px] text-muted-foreground">
+                  {proveedores.data.length - 1} {proveedores.data.length === 2 ? 'alternativo' : 'alternativos'}
                 </p>
               )}
             </>
           ) : (
-            <p className="text-muted-foreground">{p.proveedorId ? 'Cargando…' : 'Sin proveedor asignado'}</p>
+            <p className="text-muted-foreground">Sin proveedor asignado</p>
           )}
         </div>
       </div>
 
       <Seccion
-        titulo="Historial de movimientos"
+        titulo={`Historial de movimientos · ${sucursal.nombre}`}
         acciones={historial && <span className="text-[13px] text-muted-foreground">{historial.length} {historial.length === 1 ? 'movimiento' : 'movimientos'}</span>}
       >
         {movimientos.error ? (
@@ -97,7 +115,7 @@ export function ProductoDetallePage() {
         ) : !historial ? (
           <TablaCargando filas={4} columnas={5} />
         ) : historial.length === 0 ? (
-          <p className="py-6 text-center text-muted-foreground">Este producto todavía no tiene movimientos.</p>
+          <p className="py-6 text-center text-muted-foreground">Este producto todavía no tiene movimientos en la sucursal.</p>
         ) : (
           <Table>
             <TableHeader>
@@ -106,7 +124,7 @@ export function ProductoDetallePage() {
                 <TableHead className="text-muted-foreground">Tipo</TableHead>
                 <TableHead className="text-right text-muted-foreground">Cantidad</TableHead>
                 <TableHead className="text-right text-muted-foreground">Stock resultante</TableHead>
-                <TableHead className="text-muted-foreground">Observación</TableHead>
+                <TableHead className="text-muted-foreground">Detalle</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -118,7 +136,9 @@ export function ProductoDetallePage() {
                   </TableCell>
                   <TableCell className="tabular text-right font-medium">{fmtDelta(delta(m.tipo, m.cantidad))}</TableCell>
                   <TableCell className="tabular text-right">{fmtNumero(m.stockResultante)}</TableCell>
-                  <TableCell className="text-muted-foreground">{m.observacion ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {[m.motivo ?? m.observaciones, m.referencia].filter(Boolean).join(' · ') || TIPO_LABEL[m.tipo]}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -126,7 +146,7 @@ export function ProductoDetallePage() {
         )}
       </Seccion>
 
-      {editar > 0 && <ProductoDialog key={editar} open producto={p} onOpenChange={(o) => !o && setEditar(0)} />}
+      {editar > 0 && <ProductoDialog key={editar} open producto={p} stock={fila} preferido={preferido} onOpenChange={(o) => !o && setEditar(0)} />}
     </>
   )
 }

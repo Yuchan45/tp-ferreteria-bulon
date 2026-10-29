@@ -1,6 +1,7 @@
-import type { Rol, TipoMovimiento } from '@/api/types'
+import type { Rol, TipoMovimiento, UnidadMedida } from '@/api/types'
 
-const enteros = new Intl.NumberFormat('es-AR')
+// Hasta 3 decimales: las cantidades por metro, kilo o litro pueden ser fraccionarias
+const enteros = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 3 })
 const pesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
@@ -20,7 +21,7 @@ export function aNumero(valor: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-export const fmtPrecio =(n: number | null) => (n == null ? '—' : pesos.format(n))
+export const fmtPrecio = (n: number | null) => (n == null ? '—' : pesos.format(n))
 
 // El backend envía LocalDateTime sin zona: se interpreta como hora local.
 const fecha = (iso: string) => new Date(iso)
@@ -47,16 +48,30 @@ export const diaLocal = (iso: string) => {
 }
 
 export const TIPO_LABEL: Record<TipoMovimiento, string> = {
-  ENTRADA: 'Ingreso',
-  SALIDA: 'Salida',
+  INGRESO_COMPRA: 'Compra',
+  SALIDA_VENTA: 'Venta',
+  DEVOLUCION_CLIENTE: 'Devolución de cliente',
+  DEVOLUCION_PROVEEDOR: 'Devolución a proveedor',
+  ROTURA: 'Rotura',
   AJUSTE: 'Ajuste',
 }
 
 export const ROL_LABEL: Record<Rol, string> = {
   ADMINISTRADOR: 'Administrador',
-  ENCARGADO_DEPOSITO: 'Encargado de depósito',
-  VENDEDOR: 'Vendedor',
+  EMPLEADO: 'Empleado',
 }
+
+export const UNIDAD_LABEL: Record<UnidadMedida, string> = {
+  UNIDAD: 'Unidad',
+  METRO: 'Metro',
+  KILOGRAMO: 'Kilogramo',
+  LITRO: 'Litro',
+  CAJA: 'Caja',
+  ROLLO: 'Rollo',
+}
+
+/** Solo estas unidades admiten cantidades con decimales (igual que el backend). */
+export const esFraccionable = (u: UnidadMedida) => u === 'METRO' || u === 'KILOGRAMO' || u === 'LITRO'
 
 export const iniciales = (nombre: string) =>
   nombre

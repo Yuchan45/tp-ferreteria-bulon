@@ -1,0 +1,268 @@
+// Bulón S.R.L. — Sistema de gestión de stock
+// Esquema v2 (propuesto). Reemplaza al modelo de v1.txt, que es el implementado hoy
+// en la migración V1__esquema_inicial.sql.
+
+Project bulon_stock {
+  database_type: 'SQL Server'
+  Note: '''
+    # Bulón S.R.L. — Sistema de gestión de stock (v2)
+
+    **Alcance:** el stock se gestiona por sucursal (hoy 1, preparado para N).
+    Los proveedores son empresas externas: no se gestiona su stock. Cuando una
+    sucursal llega al punto de pedido se genera una alerta, se notifica a los
+    usuarios y se solicita reposición a un proveedor.
+
+    **Cantidades:** decimal(12,3) para poder vender por metro, kilo o litro.
+
+    **Enums:** se guardan como VARCHAR con CHECK constraint; se modelan como Enum
+    para que el diagrama muestre los valores posibles.
+
+    **Auditoría:** los movimientos registran quién cambió el stock. Las tablas
+    maestras guardan quién y cuándo las modificó por última vez
+    (actualizado_por / actualizado_en).
+  '''
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+Enum rol {
+  ADMINISTRADOR  // todo el sistema y todas las sucursales
+  EMPLEADO       // opera el stock de su sucursal
+}
+
+Enum unidad_medida {
+  UNIDAD
+  METRO
+  KILOGRAMO
+  LITRO
+  CAJA
+  ROLLO
+}
+
+Enum tipo_movimiento {
+  INGRESO_COMPRA        // entra stock (requiere proveedor)
+  SALIDA_VENTA          // sale stock
+  DEVOLUCION_CLIENTE    // entra stock
+  DEVOLUCION_PROVEEDOR  // sale stock (requiere proveedor)
+  ROTURA                // sale stock (rotura o pérdida)
+  AJUSTE                // + o − (recuento), motivo obligatorio
+}
+
+Enum nivel_alerta {
+  REPONER  // cantidad <= punto_pedido
+  CRITICO  // cantidad <= stock_minimo
+}
+
+Enum estado_alerta {
+  ABIERTA
+  EN_GESTION  // ya tiene una solicitud de reposición asociada
+  RESUELTA    // la cantidad volvió a superar el punto de pedido
+}
+
+Enum estado_solicitud {
+  PENDIENTE   // creada o sugerida por una alerta, sin enviar
+  ENVIADA     // pedida al proveedor
+  RECIBIDA    // llegó la mercadería → genera los INGRESO_COMPRA
+  CANCELADA
+}
+
+// ───────────────────── Organización y usuarios ─────────────────
+
+Table sucursales {
+  id        bigint       [pk, increment]
+  codigo    varchar(20)  [not null, unique, note: 'Ej.: SUC-01']
+  nombre    varchar(100) [not null]
+  direccion varchar(200)
+  telefono  varchar(30)
+  activa    bit          [not null, default: 1]
+
+  Note: 'Ubicaciones con stock propio. Hoy hay una; el modelo admite N.'
+}
+
+Table usuarios {
+  id            bigint       [pk, increment]
+  username      varchar(50)  [not null, unique]
+  nombre        varchar(100) [not null]
+  email         varchar(150) [unique, note: 'Único si no es NULL (índice filtrado)']
+  password_hash varchar(100) [not null, note: 'BCrypt; preparado para el login']
+  rol           rol          [not null]
+  sucursal_id   bigint       [note: 'CHECK: EMPLEADO → NOT NULL; ADMINISTRADOR → NULL']
+  activo        bit          [not null, default: 1]
+  creado        datetime2    [not null, default: `SYSDATETIME()`]
+
+  Note: 'Personas que operan el sistema. Los clientes de la ferretería están fuera del alcance.'
+}
+
+// ─────────────────────────── Catálogo ──────────────────────────
+
+Table categorias {
+  id     bigint       [pk, increment]
+  nombre varchar(100) [not null, unique]
+}
+
+Table productos {
+  id              bigint        [pk, increment]
+  codigo          varchar(50)   [not null, unique, note: 'SKU']
+  nombre          varchar(100)  [not null, note: 'Nombre corto para listados']
+  descripcion     varchar(500)  [note: 'Detalle del artículo']
+  categoria_id    bigint
+  unidad_medida   unidad_medida [not null, default: 'UNIDAD']
+  precio          numeric(12,2) [note: 'Precio de venta. CHECK >= 0']
+  activo          bit           [not null, default: 1]
+  actualizado_por bigint        [note: 'Auditoría: último usuario que lo modificó']
+  actualizado_en  datetime2
+
+  Note: 'El stock no vive acá: ver stock_sucursal.'
+}
+
+Table proveedores {
+  id              bigint       [pk, increment]
+  razon_social    varchar(150) [not null]
+  cuit            varchar(13)  [note: 'Único si no es NULL (índice filtrado)']
+  telefono        varchar(30)
+  email           varchar(150)
+  contacto        varchar(100) [note: 'Persona de contacto']
+  activo          bit          [not null, default: 1]
+  actualizado_por bigint
+  actualizado_en  datetime2
+
+  Note: 'Empresa externa: no se gestiona su stock.'
+}
+
+Table producto_proveedor {
+  producto_id        bigint        [pk]
+  proveedor_id       bigint        [pk]
+  preferido          bit           [not null, default: 0]
+  codigo_proveedor   varchar(50)   [note: 'Cómo identifica el proveedor al artículo']
+  precio_costo       numeric(12,2) [note: 'CHECK >= 0. Para elegir el proveedor más barato']
+  plazo_entrega_dias int           [note: 'CHECK >= 0. Para elegir el proveedor más rápido']
+
+  indexes {
+    producto_id [unique, name: 'uq_proveedor_preferido', note: 'WHERE preferido = 1 → un solo preferido por producto']
+  }
+
+  Note: 'Qué proveedores venden cada producto (N:M).'
+}
+
+// ──────────────────────────── Stock ────────────────────────────
+
+Table stock_sucursal {
+  producto_id     bigint         [pk]
+  sucursal_id     bigint         [pk]
+  cantidad        decimal(12,3)  [not null, default: 0, note: 'CHECK >= 0. Solo cambia con movimientos']
+  stock_minimo    decimal(12,3)  [not null, default: 0, note: 'CHECK >= 0. Piso de seguridad → alerta CRITICO']
+  punto_pedido    decimal(12,3)  [not null, default: 0, note: 'CHECK >= stock_minimo. Cuándo pedir → alerta REPONER']
+  version         int            [not null, default: 0, note: 'Bloqueo optimista (@Version)']
+  actualizado_por bigint         [note: 'Último usuario que cambió mínimo o punto de pedido']
+  actualizado_en  datetime2
+
+  Note: 'Existencias de cada producto en cada sucursal.'
+}
+
+Table movimientos_stock {
+  id            bigint          [pk, increment]
+  producto_id   bigint          [not null]
+  sucursal_id   bigint          [not null]
+  usuario_id    bigint          [not null, note: 'Responsable (trazabilidad)']
+  tipo          tipo_movimiento [not null]
+  cantidad      decimal(12,3)   [not null, note: 'CHECK > 0, salvo AJUSTE (<> 0, con signo)']
+  fecha         datetime2(6)    [not null, default: `SYSDATETIME()`]
+  motivo        varchar(255)    [note: 'Obligatorio en AJUSTE, ROTURA y devoluciones']
+  observaciones varchar(500)
+  referencia    varchar(50)     [note: 'Nº de remito, factura o ticket']
+  proveedor_id  bigint          [note: 'Obligatorio en INGRESO_COMPRA y DEVOLUCION_PROVEEDOR']
+  solicitud_id  bigint          [note: 'Si el ingreso viene de una solicitud recibida']
+
+  indexes {
+    (producto_id, sucursal_id, fecha) [name: 'ix_mov_producto_sucursal_fecha', note: 'Historial por producto']
+    (sucursal_id, fecha) [name: 'ix_mov_sucursal_fecha', note: 'Historial por sucursal']
+  }
+
+  Note: 'Inmutable: nunca se edita ni se borra; los errores se corrigen con un AJUSTE.'
+}
+
+// ───────────────────── Alertas y reposición ────────────────────
+
+Table alertas_stock {
+  id               bigint        [pk, increment]
+  producto_id      bigint        [not null]
+  sucursal_id      bigint        [not null]
+  nivel            nivel_alerta  [not null]
+  estado           estado_alerta [not null, default: 'ABIERTA']
+  cantidad_al_generar decimal(12,3) [not null]
+  punto_pedido     decimal(12,3) [not null, note: 'Valor vigente al generarse']
+  stock_minimo     decimal(12,3) [not null, note: 'Valor vigente al generarse']
+  solicitud_id     bigint
+  creada           datetime2     [not null, default: `SYSDATETIME()`]
+  resuelta         datetime2
+
+  indexes {
+    (producto_id, sucursal_id) [unique, name: 'uq_alerta_activa', note: "WHERE estado <> 'RESUELTA' → una sola alerta activa"]
+  }
+
+  Note: 'Se crea cuando la cantidad llega al punto de pedido; sube a CRITICO si llega al mínimo.'
+}
+
+Table solicitudes_reposicion {
+  id           bigint           [pk, increment]
+  sucursal_id  bigint           [not null]
+  proveedor_id bigint           [not null]
+  usuario_id   bigint           [not null, note: 'Quién la creó']
+  estado       estado_solicitud [not null, default: 'PENDIENTE']
+  creada       datetime2        [not null, default: `SYSDATETIME()`]
+  enviada      datetime2
+  recibida     datetime2
+  observacion  varchar(255)
+
+  Note: 'Pedido de re-stock a un proveedor.'
+}
+
+Table solicitud_items {
+  solicitud_id        bigint        [pk]
+  producto_id         bigint        [pk]
+  cantidad_solicitada decimal(12,3) [not null, note: 'CHECK > 0']
+  cantidad_recibida   decimal(12,3) [note: 'Se completa al recibir; puede ser menor']
+}
+
+Table notificaciones {
+  id         bigint       [pk, increment]
+  usuario_id bigint       [not null, note: 'Destinatario']
+  alerta_id  bigint
+  titulo     varchar(150) [not null]
+  mensaje    varchar(500) [not null]
+  leida      bit          [not null, default: 0]
+  creada     datetime2    [not null, default: `SYSDATETIME()`]
+
+  indexes {
+    (usuario_id, leida, creada) [name: 'ix_notif_usuario']
+  }
+
+  Note: 'Al abrir una alerta se notifica a los empleados de esa sucursal y a los administradores.'
+}
+
+// ───────────────────────── Relaciones ────────────────────────
+
+Ref: usuarios.sucursal_id > sucursales.id
+Ref: productos.categoria_id > categorias.id
+Ref: productos.actualizado_por > usuarios.id
+Ref: proveedores.actualizado_por > usuarios.id
+Ref: producto_proveedor.producto_id > productos.id
+Ref: producto_proveedor.proveedor_id > proveedores.id
+Ref: stock_sucursal.producto_id > productos.id
+Ref: stock_sucursal.sucursal_id > sucursales.id
+Ref: stock_sucursal.actualizado_por > usuarios.id
+Ref: movimientos_stock.producto_id > productos.id
+Ref: movimientos_stock.sucursal_id > sucursales.id
+Ref: movimientos_stock.usuario_id > usuarios.id
+Ref: movimientos_stock.proveedor_id > proveedores.id
+Ref: movimientos_stock.solicitud_id > solicitudes_reposicion.id
+Ref: alertas_stock.producto_id > productos.id
+Ref: alertas_stock.sucursal_id > sucursales.id
+Ref: alertas_stock.solicitud_id > solicitudes_reposicion.id
+Ref: solicitudes_reposicion.sucursal_id > sucursales.id
+Ref: solicitudes_reposicion.proveedor_id > proveedores.id
+Ref: solicitudes_reposicion.usuario_id > usuarios.id
+Ref: solicitud_items.solicitud_id > solicitudes_reposicion.id
+Ref: solicitud_items.producto_id > productos.id
+Ref: notificaciones.usuario_id > usuarios.id
+Ref: notificaciones.alerta_id > alertas_stock.id
