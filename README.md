@@ -92,7 +92,7 @@ cp .env.example .env      # completar DB_PASSWORD (por defecto: Bulon_Dev_2026!)
 - API en `http://localhost:8080/api`
 - Estado del sistema: `http://localhost:8080/api/health`
 - Con `SEED_ENABLED=true` en el `.env`, la primera vez carga datos de ejemplo: 1 sucursal,
-  3 usuarios (contraseña `bulon1234`), 6 proveedores y 27 productos de ferretería.
+  3 usuarios (`admin` / `admin` y empleados con contraseña `empleado`), 6 proveedores y 27 productos de ferretería.
 
 ### 3. Frontend
 
@@ -102,7 +102,7 @@ npm install
 npm run dev               # http://localhost:5173
 ```
 
-Se entra con `admin` / `bulon1234` (administrador) o `ventas` / `bulon1234` (empleado), o
+Se entra con `admin` / `admin` (administrador) o `ventas` / `empleado` (empleado), o
 creando una cuenta en `/registro` (siempre como empleado). El menú y los botones de alta se
 adaptan al rol, pero la seguridad real la aplica el backend.
 

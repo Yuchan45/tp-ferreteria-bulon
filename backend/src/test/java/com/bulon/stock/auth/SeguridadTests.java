@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Login, registro y permisos por rol, sobre los usuarios del seeder (contraseña bulon1234). */
+/** Login, registro y permisos por rol, sobre los usuarios del seeder (admin/admin, empleados/empleado). */
 @SpringBootTest(properties = {
         "app.seed.enabled=true",
         "spring.datasource.url=jdbc:h2:mem:seguridad_test;MODE=MSSQLServer;DB_CLOSE_DELAY=-1"
@@ -48,7 +48,7 @@ class SeguridadTests {
 
     @Test
     void loginCorrectoDevuelveTokenYUsuario() throws Exception {
-        JsonNode sesion = login("admin", "bulon1234");
+        JsonNode sesion = login("admin", "admin");
         assertThat(sesion.get("token").asText()).isNotBlank();
         assertThat(sesion.at("/usuario/rol").asText()).isEqualTo("ADMINISTRADOR");
         assertThat(sesion.at("/usuario").has("passwordHash")).isFalse();
@@ -56,7 +56,7 @@ class SeguridadTests {
 
     @Test
     void loginIncorrectoNoDiceQueFallo() throws Exception {
-        for (String[] credenciales : new String[][]{{"admin", "otra-clave"}, {"no-existe", "bulon1234"}}) {
+        for (String[] credenciales : new String[][]{{"admin", "otra-clave"}, {"no-existe", "empleado"}}) {
             mvc.perform(api(post("/api/auth/login"))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json.writeValueAsString(new AuthDTOs.LoginRequest(credenciales[0], credenciales[1]))))
@@ -67,7 +67,7 @@ class SeguridadTests {
 
     @Test
     void unTokenAdulteradoSeRechaza() throws Exception {
-        String token = login("ventas", "bulon1234").get("token").asText();
+        String token = login("ventas", "empleado").get("token").asText();
         String adulterado = token.substring(0, token.length() - 4) + "AAAA";
         mvc.perform(api(get("/api/productos")).header("Authorization", "Bearer " + adulterado))
                 .andExpect(status().isUnauthorized());
@@ -117,8 +117,8 @@ class SeguridadTests {
     @Test
     void elResponsableDelMovimientoSaleDelToken() throws Exception {
         String empleado = token("ventas");
-        long empleadoId = login("ventas", "bulon1234").at("/usuario/id").asLong();
-        long adminId = login("admin", "bulon1234").at("/usuario/id").asLong();
+        long empleadoId = login("ventas", "empleado").at("/usuario/id").asLong();
+        long adminId = login("admin", "admin").at("/usuario/id").asLong();
         long productoId = json.readTree(mvc.perform(conToken(get("/api/stock?sucursalId=" + sucursalId()), empleado))
                 .andReturn().getResponse().getContentAsString()).get(0).get("productoId").asLong();
 
@@ -137,7 +137,7 @@ class SeguridadTests {
     }
 
     private String token(String username) throws Exception {
-        return login(username, "bulon1234").get("token").asText();
+        return login(username, username.equals("admin") ? "admin" : "empleado").get("token").asText();
     }
 
     private JsonNode login(String username, String password) throws Exception {

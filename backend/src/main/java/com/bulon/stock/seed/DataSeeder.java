@@ -40,7 +40,8 @@ import java.util.Map;
  * El stock inicial se registra como compras (INGRESO_COMPRA) al proveedor preferido,
  * así el stock de cada sucursal coincide con su historial. Algunos productos quedan
  * en o por debajo del punto de pedido para probar las alertas de reposición.
- * Todos los usuarios de ejemplo tienen la contraseña {@value #PASSWORD_DESARROLLO}.
+ * Contraseñas de desarrollo: {@value #PASSWORD_ADMIN} para el administrador y
+ * {@value #PASSWORD_EMPLEADO} para los empleados.
  */
 @Slf4j
 @Component
@@ -48,7 +49,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DataSeeder implements ApplicationRunner {
 
-    static final String PASSWORD_DESARROLLO = "bulon1234";
+    // "admin" es más corta que el mínimo de 8 que exige la API: el seeder crea los usuarios
+    // con el servicio, que no pasa por @Valid. Desde la app no se podría poner.
+    static final String PASSWORD_ADMIN = "admin";
+    static final String PASSWORD_EMPLEADO = "empleado";
     static final String CODIGO_SUCURSAL = "SUC-01";
 
     private final SucursalService sucursalService;
@@ -217,10 +221,12 @@ public class DataSeeder implements ApplicationRunner {
             return;
         }
         for (UsuarioSeed seed : USUARIOS) {
+            boolean admin = seed.rol() == Rol.ADMINISTRADOR;
             usuarioService.crear(new UsuarioRequest(seed.username(), seed.nombre(), seed.email(),
-                    PASSWORD_DESARROLLO, seed.rol(), seed.rol() == Rol.EMPLEADO ? sucursal.getId() : null, true));
+                    admin ? PASSWORD_ADMIN : PASSWORD_EMPLEADO, seed.rol(), admin ? null : sucursal.getId(), true));
         }
-        log.info("Seeder: {} usuarios cargados (contraseña de desarrollo: {})", USUARIOS.size(), PASSWORD_DESARROLLO);
+        log.info("Seeder: {} usuarios cargados (contraseñas de desarrollo: admin → {}, empleados → {})",
+                USUARIOS.size(), PASSWORD_ADMIN, PASSWORD_EMPLEADO);
     }
 
     private void seedCatalogo(Sucursal sucursal) {

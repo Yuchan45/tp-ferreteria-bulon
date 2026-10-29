@@ -58,7 +58,7 @@ cp .env.example .env        # desde backend/, y completar DB_PASSWORD
 | `JWT_SECRET`  | clave para firmar los tokens, mínimo 32 caracteres. Generarla con `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
 
 El seeder (`seed/DataSeeder.java`) carga 1 sucursal, 3 usuarios (`admin`, `encargado`, `ventas`;
-contraseña de desarrollo `bulon1234`), 5 categorías, 6 proveedores y 27 productos (dos se venden
+contraseñas de desarrollo: `admin` para el administrador y `empleado` para los empleados), 5 categorías, 6 proveedores y 27 productos (dos se venden
 por metro y por kilo). El stock inicial se registra como compras al proveedor preferido y hay un
 movimiento de ejemplo de cada tipo. Algunos productos quedan en o por debajo del punto de pedido
 para probar las alertas. Solo carga en tablas vacías; para volver a cargarlo desde cero:
