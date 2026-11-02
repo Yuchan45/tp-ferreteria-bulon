@@ -96,6 +96,7 @@ GO
 /* ═══════════════════════════════════════════════════════════════════════
  * 4. PROVEEDORES
  * ═══════════════════════════════════════════════════════════════════════ */
+select * from proveedores
 
 -- 4.1 Proveedores con cantidad de productos que venden y en cuántos son preferidos
 SELECT pr.id, pr.razon_social, pr.cuit, pr.telefono, pr.email, pr.contacto, pr.activo,
@@ -145,6 +146,7 @@ GO
 /* ═══════════════════════════════════════════════════════════════════════
  * 5. PRODUCTOS
  * ═══════════════════════════════════════════════════════════════════════ */
+select * from productos
 
 -- 5.1 Catálogo con categoría, proveedor preferido y stock total (todas las sucursales)
 SELECT p.id, p.codigo, p.nombre, c.nombre AS categoria, p.unidad_medida, p.precio, p.activo,
