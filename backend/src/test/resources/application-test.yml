@@ -4,6 +4,10 @@ spring:
     username: sa
     password:
     driver-class-name: org.h2.Driver
+  output:
+    ansi:
+      # Sin códigos de color en los tests, que leen la salida de la consola
+      enabled: never
   flyway:
     # Las migraciones son T-SQL de SQL Server; en H2 el esquema lo genera Hibernate
     enabled: false
@@ -15,3 +19,6 @@ app:
   seed:
     # Ignora SEED_ENABLED del .env; DataSeederTests lo activa explícitamente
     enabled: false
+  jwt:
+    # Clave fija solo para los tests (en desarrollo se usa JWT_SECRET del .env)
+    secret: clave-de-prueba-solo-para-tests-0123456789abcdef

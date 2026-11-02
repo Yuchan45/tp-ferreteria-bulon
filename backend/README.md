@@ -8,12 +8,24 @@ Monolito modular con arquitectura en capas (Controller → Service → Repositor
 ```
 src/main/java/com/bulon/stock/
 ├── StockApplication.java
-├── common/exception/      # Excepciones y manejo global de errores
-├── productos/             # Catálogo, stock mínimo, consulta de bajo stock
-├── movimientos/           # Entradas, salidas y ajustes de stock
+├── auth/                  # Login, registro, JWT y reglas de seguridad (SecurityConfig)
+├── common/                # Errores globales y auditoría
+├── sucursales/            # Sucursales (ubicaciones con stock)
+├── categorias/            # Categorías de productos
+├── productos/             # Catálogo y proveedores de cada producto (N:M, con preferido)
+├── stock/                 # Stock por producto y sucursal, umbrales y productos a reponer
+├── alertas/               # Alertas de reposición: observan el stock (Observer)
+├── notificaciones/        # Avisos in-app: observan las alertas (Observer)
+├── reportes/              # Reportes PDF / Excel: ExportadorReporte + adaptadores (Adapter)
+│   └── canales/           # Decorator: NotificadorSistema (campanita) + ConEmail
+├── movimientos/           # Compras, ventas, devoluciones, roturas y ajustes
+│   └── estrategias/       # Strategy (reglas de cada tipo) + Simple Factory (FabricaMovimientos)
 ├── proveedores/           # Alta y consulta de proveedores
-└── usuarios/              # Usuarios y roles
+├── usuarios/              # Usuarios (ADMINISTRADOR / EMPLEADO de una sucursal)
+└── seed/                  # Datos de ejemplo para desarrollo
 ```
+
+El modelo de datos está en `db/dbdiagram/v2.txt` (v1.txt es el esquema anterior).
 
 Cada módulo agrupa su entidad, repositorio, servicio, controlador y DTOs.
 Un módulo solo accede a otro a través de su `Service`, nunca a su `Repository`.
@@ -30,7 +42,8 @@ docker compose down -v      # detiene y BORRA los datos
 
 El esquema lo manejan las migraciones de **Flyway** en `src/main/resources/db/migration`,
 que se aplican solas al iniciar el backend. Hibernate solo valida que las entidades coincidan
-(`ddl-auto: validate`). Para cambiar el modelo se agrega un script nuevo (`V2__descripcion.sql`, ...);
+(`ddl-auto: validate`). Hoy hay tres: `V1` (esquema inicial), `V2` (sucursales, categorías, alertas y
+notificaciones) y `V3` (quita las solicitudes de reposición, fuera de alcance). Para cambiar el modelo se agrega un script nuevo (`V4__descripcion.sql`, ...);
 nunca se modifica uno ya aplicado.
 
 ## Configuración
@@ -48,10 +61,18 @@ cp .env.example .env        # desde backend/, y completar DB_PASSWORD
 | `DB_USER`     | `sa`                                                          |
 | `DB_PASSWORD` | la misma que `MSSQL_SA_PASSWORD` de `docker-compose.yml` (por defecto `Bulon_Dev_2026!`) |
 | `SEED_ENABLED`| `true` carga datos de ejemplo de la ferretería si la base está vacía (default `false`) |
+| `JWT_SECRET`  | clave para firmar los tokens, mínimo 32 caracteres. Generarla con `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
 
-El seeder (`seed/DataSeeder.java`) carga 3 usuarios, 5 proveedores y 25 productos, con el stock
-inicial registrado como movimientos de entrada. Algunos productos quedan bajo el stock mínimo
-para probar las alertas de reposición. Para volver a cargarlo desde cero: `docker compose down -v`.
+El seeder (`seed/DataSeeder.java`) carga 1 sucursal, 3 usuarios (`admin`, `encargado`, `ventas`;
+contraseñas de desarrollo: `admin` para el administrador y `empleado` para los empleados), 5 categorías, 6 proveedores y 27 productos (dos se venden
+por metro y por kilo). El stock inicial se registra como compras al proveedor preferido y hay un
+movimiento de ejemplo de cada tipo. Algunos productos quedan en o por debajo del punto de pedido
+para probar las alertas. Solo carga en tablas vacías; para volver a cargarlo desde cero:
+`docker compose down -v`.
+
+Al migrar una base v1 con datos, la V2 crea la sucursal `SUC-01` y le asigna todo el stock, pasa
+el proveedor de cada producto a preferido, convierte los roles viejos en `EMPLEADO` y asigna los
+movimientos históricos a un administrador. Los usuarios existentes quedan con la contraseña `bulon1234`.
 
 Las variables de entorno del sistema tienen prioridad sobre el `.env`.
 Si falta el archivo, el backend no arranca y muestra un error como
@@ -66,19 +87,127 @@ docker compose up -d        # 1. desde la raíz del repo
 ```
 
 Para conectarse con un cliente (Azure Data Studio, DBeaver, SSMS): `localhost,1433`, usuario `sa`.
-Si se usa `sqlcmd`, agregar `-I` (lo requiere el índice filtrado de `proveedores.cuit`).
+Si se usa `sqlcmd`, agregar `-I` (lo requieren los índices filtrados).
+Consultas de ejemplo en `db/scripts/queries.sql`.
 
-## Endpoints iniciales
+## Autenticación y roles
 
-| Método | Ruta                          | Descripción                     |
-|--------|-------------------------------|---------------------------------|
-| GET    | `/api/health`                 | Estado de la API y de la base (200 `UP` / 503 `DOWN`) |
-| GET    | `/api/productos`              | Listar productos                |
-| GET    | `/api/productos/{id}`         | Obtener producto                |
-| GET    | `/api/productos/bajo-stock`   | Productos a reponer             |
-| POST   | `/api/productos`              | Crear producto                  |
-| PUT    | `/api/productos/{id}`         | Actualizar producto             |
-| GET    | `/api/movimientos?productoId=`| Historial de un producto        |
-| POST   | `/api/movimientos`            | Registrar entrada/salida/ajuste |
-| GET/POST | `/api/proveedores`          | Listar / crear proveedores      |
-| GET/POST | `/api/usuarios`             | Listar / crear usuarios         |
+La API es *stateless*: `POST /api/auth/login` devuelve un **JWT** (válido 8 h) que el cliente
+envía en cada pedido como `Authorization: Bearer <token>`. El token lleva el id del usuario, su
+rol y su sucursal; el servidor lo valida con la firma (HS256 + `JWT_SECRET`), sin guardar sesiones.
+
+La protección tiene tres capas:
+
+1. **URL** (`auth/SecurityConfig`): `/health`, `/auth/login`, `/auth/registro` y `GET /sucursales`
+   son públicos; todo lo demás exige token → si falta o es inválido, `401`.
+2. **Rol** (`@PreAuthorize("hasRole('ADMINISTRADOR')")` en controladores): el claim `rol` del
+   token se convierte en la autoridad `ROLE_<rol>`. Si el rol no alcanza → `403`.
+3. **Datos** (servicios): un `EMPLEADO` solo opera su sucursal y el responsable de cada
+   movimiento sale del token, no del cuerpo del pedido.
+
+Por ser un proyecto académico, el registro público permite **elegir el rol** para probar el
+sistema con los dos perfiles: sin `rol` se crea un `ADMINISTRADOR` (sin sucursal, aunque se envíe
+una); un `EMPLEADO` debe indicar su `sucursalId`. En un sistema real, el registro crearía solo
+empleados y los administradores se darían de alta desde `POST /api/usuarios`.
+
+## Endpoints
+
+🔓 público · 👤 cualquier usuario logueado · 🔑 solo `ADMINISTRADOR`
+
+| Método | Ruta                                     | Acceso | Descripción |
+|--------|------------------------------------------|--------|-------------|
+| GET    | `/api/health`                            | 🔓 | Estado de la API y de la base (200 `UP` / 503 `DOWN`) |
+| POST   | `/api/auth/login`                        | 🔓 | `{username, password}` → `{token, expira, usuario}` |
+| POST   | `/api/auth/registro`                     | 🔓 | Alta con el `rol` elegido (por defecto `ADMINISTRADOR`), devuelve la sesión iniciada (201) |
+| GET    | `/api/auth/yo`                           | 👤 | Usuario del token |
+| GET    | `/api/sucursales`, `/api/sucursales/{id}`| 🔓 | Sucursales |
+| GET / POST | `/api/categorias`                    | 👤 / 🔑 | Listar / crear categorías |
+| GET / POST | `/api/productos`                     | 👤 / 🔑 | Listar (con `stockTotal`) / crear producto (crea su stock en 0 en cada sucursal) |
+| GET / PUT  | `/api/productos/{id}`                | 👤 / 🔑 | Ver / actualizar producto |
+| GET    | `/api/productos/{id}/stock`              | 👤 | Stock del producto en cada sucursal, con su estado |
+| PUT    | `/api/productos/{id}/stock/{sucursalId}` | 🔑 | Configurar `stockMinimo` y `puntoPedido` |
+| GET    | `/api/productos/{id}/proveedores`        | 👤 | Proveedores del producto (el preferido primero) |
+| PUT    | `/api/productos/{id}/proveedores/{proveedorId}` | 🔑 | Asociar proveedor o cambiar sus condiciones |
+| GET    | `/api/productos/bajo-stock?sucursalId=`  | 👤 | En o por debajo del punto de pedido (`sucursalId` opcional) |
+| GET    | `/api/alertas?sucursalId=`               | 👤 | Alertas activas, primero las críticas (`sucursalId` opcional) |
+| GET    | `/api/notificaciones`                    | 👤 | `{noLeidas, notificaciones}`: las últimas 30 del usuario del token |
+| PUT    | `/api/notificaciones/{id}/leida`, `/api/notificaciones/leidas` | 👤 | Marcar una / todas como leídas (solo las propias) |
+| GET    | `/api/reportes/stock?sucursalId=&formato=&categoriaId=&estado=&q=` | 👤 | Stock por sucursal |
+| GET    | `/api/reportes/movimientos?sucursalId=&formato=&desde=&hasta=&tipo=&q=` | 👤 | Movimientos de un período (`desde`/`hasta` en `yyyy-mm-dd`, ambos incluidos) |
+| GET    | `/api/reportes/a-reponer?sucursalId=&formato=&estado=&q=` | 👤 | Productos a reponer, con faltante, proveedor preferido y costo estimado |
+| GET    | `/api/stock?sucursalId=`                 | 👤 | Stock de todos los productos en una sucursal |
+| GET    | `/api/movimientos?productoId=&sucursalId=&desde=&hasta=&tipo=&q=` | 👤 | Historial de un producto, de una sucursal o de ambos, con el stock resultante de cada movimiento (ver abajo) |
+| POST   | `/api/movimientos`                       | 👤 | Registrar un movimiento |
+| GET / POST | `/api/proveedores`                   | 👤 / 🔑 | Listar / crear proveedores |
+| PUT    | `/api/proveedores/{id}`                  | 🔑 | Editar un proveedor y activarlo o desactivarlo (`activo`) |
+| GET/POST | `/api/usuarios`                        | 🔑 | Listar / crear usuarios (la API nunca devuelve la contraseña) |
+| PUT    | `/api/usuarios/{id}`                     | 🔑 | Editar un usuario, activarlo o desactivarlo y, si se envía `password`, resetear su contraseña |
+
+### Reglas al registrar un movimiento
+
+- Tipos: `INGRESO_COMPRA` y `DEVOLUCION_CLIENTE` suman · `SALIDA_VENTA`, `DEVOLUCION_PROVEEDOR` y
+  `ROTURA` restan · `AJUSTE` aplica la cantidad con su signo.
+- El responsable es el usuario del token (no se envía `usuarioId`).
+- Un `EMPLEADO` solo opera su sucursal; el `ADMINISTRADOR`, todas.
+- Compras y devoluciones a proveedor exigen un proveedor que venda ese producto.
+- Ajustes, roturas y devoluciones exigen motivo.
+- Solo los productos por metro, kilo o litro admiten decimales.
+- El stock no puede quedar negativo. Si dos operaciones cambian el mismo stock a la vez, la
+  segunda recibe `409` (bloqueo optimista).
+
+### Historial de movimientos
+
+`GET /api/movimientos` necesita `productoId`, `sucursalId` o ambos; `desde` y `hasta`
+(`yyyy-mm-dd`, ambos días incluidos), `tipo` y `q` (código o nombre del producto, sin
+mayúsculas ni acentos) son opcionales. Devuelve del más reciente al más antiguo, con el
+producto, el responsable, el proveedor, el `efecto` con signo y el `stockResultante`. El stock
+resultante no se guarda: se reconstruye hacia atrás desde el stock actual. La vista
+Movimientos y el reporte de movimientos usan esta misma consulta.
+
+### Edición de usuarios y proveedores
+
+- Un **usuario desactivado** no puede iniciar sesión, no recibe notificaciones y no puede
+  registrar movimientos. El username no se cambia; la contraseña solo si se envía una nueva.
+- Un administrador no puede desactivarse ni quitarse el rol a sí mismo, y siempre tiene que
+  quedar al menos un administrador activo.
+- A un **proveedor desactivado** no se le registran compras (devolverle mercadería sí); su
+  historial se conserva.
+
+### Alertas y notificaciones (patrón Observer)
+
+```
+movimiento o cambio de umbrales → StockService (Subject)
+   └─ AlertaService (StockObserver): abre, sube a CRITICO o resuelve la alerta
+         └─ NotificacionService (AlertaObserver): avisa a los empleados de la sucursal y a los admins
+```
+
+- Hay una sola alerta activa por producto y sucursal: `REPONER` (≤ punto de pedido) o `CRITICO` (≤ mínimo).
+- Se notifica al abrirse una alerta y al subir a `CRITICO`; resolverla no genera aviso.
+- Los canales dependen del nivel (patrón Decorator, `notificaciones/canales/`): lo urgente sale
+  por más canales. Le llega igual a todos los destinatarios, empleados y administradores.
+
+  | Nivel     | Canales                        | Notificador                              |
+  |-----------|--------------------------------|------------------------------------------|
+  | `REPONER` | Campanita                      | `NotificadorSistema`                     |
+  | `CRITICO` | Campanita + email              | `new ConEmail(NotificadorSistema)`       |
+
+  El email es **simulado**: se escribe en el log `[EMAIL] a ventas@bulon.com.ar: Stock crítico: …`.
+  Un usuario sin email recibe solo la campanita.
+- Al arrancar, el backend revisa todo el stock para que las alertas coincidan con los datos.
+
+### Reportes (patrón Adapter)
+
+`formato` es `pdf` (por defecto) o `excel`; los demás filtros son opcionales. La respuesta es el
+archivo con `Content-Disposition: attachment` (por ejemplo `stock-suc-01-2026-11-02.pdf`).
+
+```
+ReporteService ── arma un Reporte (título, filtros, columnas, filas, resumen), sin saber de formatos
+   └─ ExportadorReporte (Target) ── elegido por formato
+         ├─ PdfReporteAdapter   → OpenPDF (Document, PdfPTable…)
+         └─ ExcelReporteAdapter → Apache POI (Workbook, Sheet, Cell…)
+```
+
+Sumar un formato (por ejemplo CSV) es agregar otro adaptador; los reportes no cambian.
+
+Errores: `401` sin sesión o credenciales inválidas · `403` rol sin permiso · `404` recurso
+inexistente · `422` regla de negocio · `400` validación · `409` conflicto.
