@@ -1,9 +1,13 @@
 import { api, post } from './client'
-import type { Movimiento, MovimientoInput } from './types'
+import type { FiltroMovimientos, Movimiento, MovimientoInput } from './types'
 
-/** Historial de un producto en una sucursal, del más reciente al más antiguo. */
-export const listarMovimientos = (productoId: number, sucursalId: number, signal?: AbortSignal) =>
-  api<Movimiento[]>(`/movimientos?productoId=${productoId}&sucursalId=${sucursalId}`, { signal })
+/** Historial (del más reciente al más antiguo) con el stock resultante de cada movimiento. */
+export function listarMovimientos(filtros: FiltroMovimientos, signal?: AbortSignal) {
+  const params = new URLSearchParams()
+  for (const [clave, valor] of Object.entries(filtros)) {
+    if (valor != null && String(valor).trim() !== '') params.set(clave, String(valor).trim())
+  }
+  return api<Movimiento[]>(`/movimientos?${params}`, { signal })
+}
 
-export const registrarMovimiento = (input: MovimientoInput) =>
-  post<Movimiento>('/movimientos', input)
+export const registrarMovimiento = (input: MovimientoInput) => post<unknown>('/movimientos', input)

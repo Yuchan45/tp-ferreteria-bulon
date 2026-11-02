@@ -270,9 +270,7 @@ public class DataSeeder implements ApplicationRunner {
 
             Long proveedorId = proveedorIds.get(seed.proveedor());
             productoService.asignarProveedor(producto.id(), proveedorId, new ProductoProveedorDTO(
-                    proveedorId, null, true, "P-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias()));
-            stockService.configurarUmbrales(producto.id(), sucursal.getId(), new UmbralesRequest(
-                    new BigDecimal(seed.stockMinimo()), new BigDecimal(seed.puntoPedido())));
+                    proveedorId, null, true, "P-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias(), null));
 
             BigDecimal inicial = new BigDecimal(seed.stockInicial());
             if (inicial.signum() > 0) {
@@ -280,12 +278,16 @@ public class DataSeeder implements ApplicationRunner {
                         null, producto.id(), sucursal.getId(), responsableId, TipoMovimiento.INGRESO_COMPRA, inicial,
                         null, null, "Stock inicial", String.format("REM-0001-%08d", remito++), proveedorId));
             }
+            // Los umbrales van después del stock inicial: así solo generan alerta los productos
+            // que de verdad quedan a reponer, no todos por haber arrancado en 0
+            stockService.configurarUmbrales(producto.id(), sucursal.getId(), new UmbralesRequest(
+                    new BigDecimal(seed.stockMinimo()), new BigDecimal(seed.puntoPedido())));
         }
 
         for (AlternativoSeed seed : ALTERNATIVOS) {
             Long proveedorId = proveedorIds.get(seed.proveedor());
             productoService.asignarProveedor(productoIds.get(seed.codigo()), proveedorId, new ProductoProveedorDTO(
-                    proveedorId, null, false, "MO-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias()));
+                    proveedorId, null, false, "MO-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias(), null));
         }
 
         for (MovimientoSeed seed : MOVIMIENTOS) {

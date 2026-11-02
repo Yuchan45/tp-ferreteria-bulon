@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { CircleX } from 'lucide-react'
 import { toast } from 'sonner'
 import { listarSucursales } from '@/api/catalogo'
-import type { Rol } from '@/api/types'
-import { crearUsuario } from '@/api/usuarios'
+import type { Rol, Usuario } from '@/api/types'
+import { actualizarUsuario, crearUsuario } from '@/api/usuarios'
 import { Aviso } from '@/components/common'
 import { Campo, Modal } from '@/components/forms'
 import { Button } from '@/components/ui/button'
@@ -17,17 +17,29 @@ import { ROL_LABEL } from '@/lib/format'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-/** Alta de usuario por un administrador: a diferencia del registro público, puede elegir el rol. */
-export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/**
+ * Alta de usuario por un administrador, con su rol y sucursal. Si recibe `usuario`, lo
+ * edita: el username no cambia y la contraseña solo se reemplaza si se escribe una nueva.
+ */
+export function UsuarioDialog({
+  open,
+  onOpenChange,
+  usuario,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  usuario?: Usuario
+}) {
   const { invalidate } = useDataVersion()
   const sucursales = useApi((signal) => listarSucursales(signal))
-  const [username, setUsername] = useState('')
-  const [nombre, setNombre] = useState('')
-  const [email, setEmail] = useState('')
+  const editando = usuario != null
+  const [username, setUsername] = useState(usuario?.username ?? '')
+  const [nombre, setNombre] = useState(usuario?.nombre ?? '')
+  const [email, setEmail] = useState(usuario?.email ?? '')
   const [password, setPassword] = useState('')
-  const [rol, setRol] = useState<Rol>('EMPLEADO')
-  const [sucursalElegida, setSucursalElegida] = useState('')
-  const [activo, setActivo] = useState(true)
+  const [rol, setRol] = useState<Rol>(usuario?.rol ?? 'EMPLEADO')
+  const [sucursalElegida, setSucursalElegida] = useState(usuario?.sucursalId != null ? String(usuario.sucursalId) : '')
+  const [activo, setActivo] = useState(usuario?.activo ?? true)
   const [intentado, setIntentado] = useState(false)
   const [errorServidor, setErrorServidor] = useState<string>()
   const [enviando, setEnviando] = useState(false)
@@ -37,7 +49,8 @@ export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     username: !username.trim() ? 'El usuario es obligatorio' : /\s/.test(username.trim()) ? 'Sin espacios' : undefined,
     nombre: !nombre.trim() ? 'El nombre es obligatorio' : undefined,
     email: email.trim() && !EMAIL.test(email.trim()) ? 'Email inválido' : undefined,
-    password: password.length < 8 ? 'Mínimo 8 caracteres' : undefined,
+    // Al editar, vacía = se mantiene la contraseña actual
+    password: (!editando || password) && password.length < 8 ? 'Mínimo 8 caracteres' : undefined,
     sucursal: rol === 'EMPLEADO' && !sucursalId ? 'Elegí la sucursal del empleado' : undefined,
   }
   const err = (c: keyof typeof errores) => (intentado ? errores[c] : undefined)
@@ -48,17 +61,18 @@ export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     if (Object.values(errores).some(Boolean)) return
     setEnviando(true)
     try {
-      const u = await crearUsuario({
-        username: username.trim(),
+      const datos = {
         nombre: nombre.trim(),
         email: email.trim() || null,
-        password,
         rol,
         // El administrador no se asigna a una sucursal: ve todas
         sucursalId: rol === 'EMPLEADO' ? Number(sucursalId) : null,
         activo,
-      })
-      toast.success('Usuario creado', { description: `${u.nombre} · ${ROL_LABEL[u.rol]}` })
+      }
+      const u = editando
+        ? await actualizarUsuario(usuario.id, { ...datos, password: password || null })
+        : await crearUsuario({ ...datos, username: username.trim(), password })
+      toast.success(editando ? 'Usuario actualizado' : 'Usuario creado', { description: `${u.nombre} · ${ROL_LABEL[u.rol]}` })
       invalidate()
       onOpenChange(false)
     } catch (e) {
@@ -72,7 +86,7 @@ export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      titulo="Nuevo usuario"
+      titulo={editando ? 'Editar usuario' : 'Nuevo usuario'}
       className="sm:max-w-130"
       onSubmit={enviar}
       acciones={
@@ -81,14 +95,14 @@ export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             Cancelar
           </Button>
           <Button type="submit" disabled={enviando}>
-            {enviando ? 'Creando…' : 'Crear usuario'}
+            {enviando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear usuario'}
           </Button>
         </>
       }
     >
       <div className="grid grid-cols-2 items-start gap-4">
-        <Campo label="Usuario" htmlFor="usr-username" error={err('username')}>
-          <Input id="usr-username" className="font-mono" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="encargado2" aria-invalid={!!err('username')} />
+        <Campo label="Usuario" htmlFor="usr-username" error={err('username')} ayuda={editando ? 'El usuario no se puede cambiar' : undefined}>
+          <Input id="usr-username" className="font-mono" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="encargado2" disabled={editando} aria-invalid={!!err('username')} />
         </Campo>
         <Campo label="Nombre" htmlFor="usr-nombre" error={err('nombre')}>
           <Input id="usr-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Encargado Sucursal" aria-invalid={!!err('nombre')} />
@@ -98,7 +112,12 @@ export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         <Campo label="Email" htmlFor="usr-email" error={err('email')}>
           <Input id="usr-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Opcional" aria-invalid={!!err('email')} />
         </Campo>
-        <Campo label="Contraseña inicial" htmlFor="usr-password" error={err('password')} ayuda="Mínimo 8 caracteres">
+        <Campo
+          label={editando ? 'Nueva contraseña' : 'Contraseña inicial'}
+          htmlFor="usr-password"
+          error={err('password')}
+          ayuda={editando ? 'Vacía para no cambiarla · mínimo 8 caracteres' : 'Mínimo 8 caracteres'}
+        >
           <Input id="usr-password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={!!err('password')} />
         </Campo>
       </div>
@@ -132,9 +151,12 @@ export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           </Select>
         </Campo>
       </div>
-      <div className="flex items-center gap-2">
-        <Checkbox id="usr-activo" checked={activo} onCheckedChange={(c) => setActivo(c === true)} />
-        <Label htmlFor="usr-activo">Usuario activo</Label>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <Checkbox id="usr-activo" checked={activo} onCheckedChange={(c) => setActivo(c === true)} />
+          <Label htmlFor="usr-activo">Usuario activo</Label>
+        </div>
+        {!activo && <p className="pl-6 text-[13px] text-muted-foreground">No podrá iniciar sesión ni recibirá notificaciones.</p>}
       </div>
       {errorServidor && (
         <Aviso icon={CircleX} tono="error" titulo="No se pudo guardar">

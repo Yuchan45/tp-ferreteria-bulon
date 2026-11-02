@@ -67,21 +67,47 @@ export interface ProductoProveedor {
   codigoProveedor: string | null
   precioCosto: number | null
   plazoEntregaDias: number | null
+  /** Solo en la respuesta: a un proveedor inactivo no se le registran compras. */
+  activo?: boolean
 }
 
-/** MovimientoStockDTO. `fecha` llega como LocalDateTime ISO sin zona. */
+/**
+ * Un movimiento del historial (MovimientoDetalleDTO), con los datos del producto, el
+ * responsable y el proveedor, y el stock que quedó después. `fecha` llega como
+ * LocalDateTime ISO sin zona.
+ */
 export interface Movimiento {
   id: number
   productoId: number
+  codigo: string
+  nombre: string
   sucursalId: number
   usuarioId: number
+  usuario: string
   tipo: TipoMovimiento
   cantidad: number
+  /** Cuánto cambió el stock: positivo si entró, negativo si salió. */
+  efecto: number
+  /** Stock de la sucursal inmediatamente después del movimiento. */
+  stockResultante: number
   fecha: string
   motivo: string | null
   observaciones: string | null
   referencia: string | null
   proveedorId: number | null
+  proveedor: string | null
+}
+
+/** Filtros de GET /movimientos; hace falta un producto o una sucursal. */
+export interface FiltroMovimientos {
+  productoId?: number
+  sucursalId?: number
+  /** yyyy-mm-dd, ambos días incluidos */
+  desde?: string
+  hasta?: string
+  tipo?: TipoMovimiento
+  /** Búsqueda por código o nombre del producto. */
+  q?: string
 }
 
 /** El responsable no se envía: el backend lo toma del token del usuario logueado. */
@@ -128,6 +154,28 @@ export interface UsuarioInput {
   rol: Rol
   sucursalId: number | null
   activo: boolean
+}
+
+/** Edición: el username no cambia y la contraseña es opcional (null = no se cambia). */
+export type UsuarioUpdate = Omit<UsuarioInput, 'username' | 'password'> & { password: string | null }
+
+export type NivelAlerta = 'REPONER' | 'CRITICO'
+
+export interface Notificacion {
+  id: number
+  titulo: string
+  mensaje: string
+  leida: boolean
+  creada: string
+  alertaId: number | null
+  productoId: number | null
+  nivel: NivelAlerta | null
+}
+
+/** Respuesta de GET /notificaciones: las últimas del usuario logueado. */
+export interface Bandeja {
+  noLeidas: number
+  notificaciones: Notificacion[]
 }
 
 /** Respuesta de /auth/login y /auth/registro. */

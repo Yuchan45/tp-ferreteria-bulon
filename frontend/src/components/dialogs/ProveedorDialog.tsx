@@ -2,23 +2,37 @@ import { useState } from 'react'
 import { CircleX, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
-import { crearProveedor } from '@/api/proveedores'
+import { actualizarProveedor, crearProveedor } from '@/api/proveedores'
+import type { Proveedor } from '@/api/types'
 import { Aviso } from '@/components/common'
 import { Campo, Modal } from '@/components/forms'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useDataVersion } from '@/hooks/data-context'
 
 const CUIT = /^\d{2}-\d{8}-\d$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/** Alta de proveedor o, si recibe `proveedor`, edición de sus datos y su estado. */
+export function ProveedorDialog({
+  open,
+  onOpenChange,
+  proveedor,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  proveedor?: Proveedor
+}) {
   const { invalidate } = useDataVersion()
-  const [razonSocial, setRazonSocial] = useState('')
-  const [cuit, setCuit] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [email, setEmail] = useState('')
-  const [contacto, setContacto] = useState('')
+  const editando = proveedor != null
+  const [razonSocial, setRazonSocial] = useState(proveedor?.razonSocial ?? '')
+  const [cuit, setCuit] = useState(proveedor?.cuit ?? '')
+  const [telefono, setTelefono] = useState(proveedor?.telefono ?? '')
+  const [email, setEmail] = useState(proveedor?.email ?? '')
+  const [contacto, setContacto] = useState(proveedor?.contacto ?? '')
+  const [activo, setActivo] = useState(proveedor?.activo ?? true)
   const [intentado, setIntentado] = useState(false)
   const [errorServidor, setErrorServidor] = useState<string>()
   const [enviando, setEnviando] = useState(false)
@@ -36,14 +50,15 @@ export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenC
     if (errores.razonSocial || errores.cuit || errores.email) return
     setEnviando(true)
     try {
-      const p = await crearProveedor({
+      const datos = {
         razonSocial: razonSocial.trim(),
         cuit: cuit.trim() || null,
         telefono: telefono.trim() || null,
         email: email.trim() || null,
         contacto: contacto.trim() || null,
-      })
-      toast.success('Proveedor creado', { description: p.razonSocial })
+      }
+      const p = editando ? await actualizarProveedor(proveedor.id, { ...datos, activo }) : await crearProveedor(datos)
+      toast.success(editando ? 'Proveedor actualizado' : 'Proveedor creado', { description: p.razonSocial })
       invalidate()
       onOpenChange(false)
     } catch (e) {
@@ -58,7 +73,7 @@ export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenC
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      titulo="Nuevo proveedor"
+      titulo={editando ? 'Editar proveedor' : 'Nuevo proveedor'}
       className="sm:max-w-130"
       onSubmit={enviar}
       acciones={
@@ -67,7 +82,7 @@ export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenC
             Cancelar
           </Button>
           <Button type="submit" disabled={enviando}>
-            {enviando ? 'Guardando…' : 'Guardar proveedor'}
+            {enviando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Guardar proveedor'}
           </Button>
         </>
       }
@@ -94,6 +109,19 @@ export function ProveedorDialog({ open, onOpenChange }: { open: boolean; onOpenC
       <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
         <Info className="size-4 text-primary" /> El CUIT es opcional, pero si se carga debe ser único.
       </p>
+      {editando && (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Checkbox id="prov-activo" checked={activo} onCheckedChange={(c) => setActivo(c === true)} />
+            <Label htmlFor="prov-activo">Proveedor activo</Label>
+          </div>
+          {!activo && (
+            <p className="pl-6 text-[13px] text-muted-foreground">
+              No se le podrán registrar compras. Sus compras y devoluciones anteriores quedan en el historial.
+            </p>
+          )}
+        </div>
+      )}
       {errorServidor && (
         <Aviso icon={CircleX} tono="error" titulo="No se pudo guardar">
           {errorServidor}

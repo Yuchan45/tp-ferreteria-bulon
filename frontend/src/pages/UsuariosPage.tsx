@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Plus, Users } from 'lucide-react'
+import { Pencil, Plus, Users } from 'lucide-react'
 import { listarSucursales } from '@/api/catalogo'
-import type { Rol } from '@/api/types'
+import type { Rol, Usuario } from '@/api/types'
 import { listarUsuarios } from '@/api/usuarios'
 import { ErrorCarga, EstadoVacio, SearchField, TablaCargando, Toolbar } from '@/components/common'
 import { UsuarioDialog } from '@/components/dialogs/UsuarioDialog'
@@ -19,7 +19,9 @@ export function UsuariosPage() {
   const sucursales = useApi((signal) => listarSucursales(signal))
   const [busqueda, setBusqueda] = useState('')
   const [rol, setRol] = useState<Rol | typeof TODOS>(TODOS)
-  const [nuevo, setNuevo] = useState(0)
+  // Cada apertura remonta el diálogo (key) para que arranque con los datos del usuario elegido
+  const [dialogo, setDialogo] = useState<{ key: number; usuario?: Usuario } | null>(null)
+  const abrir = (usuario?: Usuario) => setDialogo((d) => ({ key: (d?.key ?? 0) + 1, usuario }))
 
   const lista = (usuarios.data ?? [])
     .filter((u) => !busqueda || incluye(u.nombre, busqueda) || incluye(u.username, busqueda))
@@ -45,7 +47,7 @@ export function UsuariosPage() {
           </SelectContent>
         </Select>
         <div className="flex-1" />
-        <Button onClick={() => setNuevo((n) => n + 1)}>
+        <Button onClick={() => abrir()}>
           <Plus /> Nuevo usuario
         </Button>
       </Toolbar>
@@ -65,7 +67,8 @@ export function UsuariosPage() {
                 <TableHead className="text-muted-foreground">Email</TableHead>
                 <TableHead className="text-muted-foreground">Rol</TableHead>
                 <TableHead className="text-muted-foreground">Sucursal</TableHead>
-                <TableHead className="pr-4 text-muted-foreground">Estado</TableHead>
+                <TableHead className="text-muted-foreground">Estado</TableHead>
+                <TableHead className="pr-4" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -85,11 +88,16 @@ export function UsuariosPage() {
                     <span className="rounded-md border bg-muted px-2 py-0.5 text-[13px] font-medium">{ROL_LABEL[u.rol]}</span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{nombreSucursal(u.sucursalId)}</TableCell>
-                  <TableCell className="pr-4">
+                  <TableCell>
                     <span className={cn('flex items-center gap-1.5', !u.activo && 'text-muted-foreground')}>
                       <span className={cn('size-2 rounded-full', u.activo ? 'bg-stock-ok' : 'bg-muted-foreground')} aria-hidden />
                       {u.activo ? 'Activo' : 'Inactivo'}
                     </span>
+                  </TableCell>
+                  <TableCell className="pr-4 text-right">
+                    <Button variant="ghost" size="icon-sm" onClick={() => abrir(u)} aria-label={`Editar ${u.nombre}`} title="Editar">
+                      <Pencil />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -98,7 +106,7 @@ export function UsuariosPage() {
         </div>
       )}
 
-      {nuevo > 0 && <UsuarioDialog key={nuevo} open onOpenChange={(o) => !o && setNuevo(0)} />}
+      {dialogo && <UsuarioDialog key={dialogo.key} open usuario={dialogo.usuario} onOpenChange={(o) => !o && setDialogo(null)} />}
     </>
   )
 }

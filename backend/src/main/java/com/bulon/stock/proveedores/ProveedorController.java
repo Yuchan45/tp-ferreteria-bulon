@@ -30,4 +30,11 @@ public class ProveedorController {
     public Proveedor crear(@RequestBody Proveedor proveedor) {
         return proveedorService.crear(proveedor);
     }
+
+    /** Editar datos y activar o desactivar (con {@code activo}). */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public Proveedor actualizar(@PathVariable Long id, @RequestBody Proveedor datos) {
+        return proveedorService.actualizar(id, datos);
+    }
 }

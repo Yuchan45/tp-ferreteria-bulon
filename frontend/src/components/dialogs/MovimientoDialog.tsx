@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, CircleX, TriangleAlert } from 'lucide-react'
+import { ChevronRight, CircleAlert, CircleX, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { listarStock } from '@/api/catalogo'
 import { registrarMovimiento } from '@/api/movimientos'
@@ -8,6 +8,7 @@ import type { TipoMovimiento } from '@/api/types'
 import { ICONO_MOVIMIENTO } from '@/components/badges'
 import { Aviso } from '@/components/common'
 import { Campo, Modal } from '@/components/forms'
+import { ProductoSelector } from '@/components/ProductoSelector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -59,8 +60,11 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
     (signal) => (productoId ? proveedoresDeProducto(Number(productoId), signal) : Promise.resolve([])),
     [productoId],
   )
-  // Por defecto, el proveedor preferido del producto
-  const proveedorId = proveedorElegido || String(proveedores.data?.find((p) => p.preferido)?.proveedorId ?? '')
+  // A un proveedor inactivo no se le compra (devolverle mercadería sí se puede)
+  const opcionesProveedor = (proveedores.data ?? []).filter((p) => tipo !== 'INGRESO_COMPRA' || p.activo !== false)
+  // Por defecto, el proveedor preferido del producto (si se puede usar para este tipo)
+  const elegidoValido = opcionesProveedor.some((p) => String(p.proveedorId) === proveedorElegido)
+  const proveedorId = elegidoValido ? proveedorElegido : String(opcionesProveedor.find((p) => p.preferido)?.proveedorId ?? '')
 
   const n = aNumero(cantidad)
   const conProveedor = requiereProveedor(tipo)
@@ -133,25 +137,16 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
       }
     >
       <Campo label="Producto" htmlFor="mov-producto" error={intentado ? errores.producto : undefined}>
-        <Select
+        <ProductoSelector
+          id="mov-producto"
           value={productoId}
-          onValueChange={(v) => {
+          onChange={(v) => {
             setProductoId(v)
             setProveedorElegido('')
           }}
-          disabled={!stock.data}
-        >
-          <SelectTrigger id="mov-producto" className="w-full" aria-invalid={intentado && !!errores.producto}>
-            <SelectValue placeholder={stock.data ? 'Seleccionar producto' : 'Cargando productos…'} />
-          </SelectTrigger>
-          <SelectContent position="popper" className="max-h-72">
-            {stock.data?.map((s) => (
-              <SelectItem key={s.productoId} value={String(s.productoId)}>
-                <span className="font-mono text-[13px]">{s.codigo}</span> · {s.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          productos={stock.data}
+          invalid={intentado && !!errores.producto}
+        />
       </Campo>
 
       <div className="flex flex-col gap-1.5">
@@ -207,7 +202,7 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
               <SelectValue placeholder={productoId ? 'Elegí el proveedor' : 'Primero elegí el producto'} />
             </SelectTrigger>
             <SelectContent position="popper">
-              {proveedores.data?.map((p) => (
+              {opcionesProveedor.map((p) => (
                 <SelectItem key={p.proveedorId} value={String(p.proveedorId)}>
                   {p.razonSocial}
                   {p.preferido ? ' (preferido)' : ''}
@@ -258,12 +253,24 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
             <p className="flex items-center gap-2 text-[13px] text-stock-out">
               <CircleX className="size-4" /> No se puede registrar: el stock no puede quedar negativo.
             </p>
+          ) : resultante != null && resultante <= fila.stockMinimo ? (
+            // Mismas reglas que el backend: se avisa solo si la alerta es nueva o sube a crítica
+            <p className="flex items-center gap-2 text-[13px] text-stock-out">
+              <CircleAlert className="size-4 shrink-0" />
+              <span>
+                Quedará en o por debajo del stock mínimo ({fmtNumero(fila.stockMinimo)}): stock crítico.
+                {fila.estado !== 'CRITICO' && ' Se avisará por la campanita y por email.'}
+              </span>
+            </p>
           ) : (
             resultante != null &&
             resultante <= fila.puntoPedido && (
               <p className="flex items-center gap-2 text-[13px] text-stock-low">
-                <TriangleAlert className="size-4" /> Quedará en o por debajo del punto de pedido ({fmtNumero(fila.puntoPedido)}) y
-                aparecerá en "A reponer".
+                <TriangleAlert className="size-4 shrink-0" />
+                <span>
+                  Quedará en o por debajo del punto de pedido ({fmtNumero(fila.puntoPedido)}) y aparecerá en "A reponer".
+                  {fila.estado === 'OK' && ' Se avisará por la campanita.'}
+                </span>
               </p>
             )
           )}

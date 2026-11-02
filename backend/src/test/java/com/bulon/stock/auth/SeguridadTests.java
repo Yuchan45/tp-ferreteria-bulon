@@ -1,5 +1,6 @@
 package com.bulon.stock.auth;
 
+import com.bulon.stock.proveedores.ProveedorService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,8 @@ class SeguridadTests {
     private MockMvc mvc;
     @Autowired
     private ObjectMapper json;
+    @Autowired
+    private ProveedorService proveedorService;
 
     @Test
     void sinTokenLaApiRespondeNoAutorizado() throws Exception {
@@ -98,20 +101,61 @@ class SeguridadTests {
     }
 
     @Test
-    void elRegistroCreaUnEmpleadoAunqueSePidaOtroRol() throws Exception {
+    void elRegistroCreaUnEmpleadoDeLaSucursalElegida() throws Exception {
         String body = """
                 {"username":"nuevo","nombre":"Empleado Nuevo","password":"clave-segura",
-                 "sucursalId":%d,"rol":"ADMINISTRADOR"}""".formatted(sucursalId());
+                 "sucursalId":%d,"rol":"EMPLEADO"}""".formatted(sucursalId());
 
         String respuesta = mvc.perform(api(post("/api/auth/registro")).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.usuario.rol").value("EMPLEADO"))
+                .andExpect(jsonPath("$.usuario.sucursalId").value(sucursalId()))
                 .andReturn().getResponse().getContentAsString();
 
         String token = json.readTree(respuesta).get("token").asText();
         mvc.perform(conToken(get("/api/auth/yo"), token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("nuevo"));
+        mvc.perform(conToken(get("/api/usuarios"), token)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void sinRolElRegistroCreaUnAdministradorSinSucursal() throws Exception {
+        // Aunque el formulario mande una sucursal, el administrador ve todas
+        String body = """
+                {"username":"nuevo-admin","nombre":"Admin Nuevo","password":"clave-segura",
+                 "sucursalId":%d}""".formatted(sucursalId());
+
+        String respuesta = mvc.perform(api(post("/api/auth/registro")).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.usuario.rol").value("ADMINISTRADOR"))
+                .andExpect(jsonPath("$.usuario.sucursalId").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        String token = json.readTree(respuesta).get("token").asText();
+        mvc.perform(conToken(get("/api/usuarios"), token)).andExpect(status().isOk());
+    }
+
+    @Test
+    void unEmpleadoSinSucursalNoSePuedeRegistrar() throws Exception {
+        String body = """
+                {"username":"sin-sucursal","nombre":"Sin Sucursal","password":"clave-segura","rol":"EMPLEADO"}""";
+
+        mvc.perform(api(post("/api/auth/registro")).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void laAuditoriaGuardaQuienModificoLaFila() throws Exception {
+        long adminId = login("admin", "admin").at("/usuario/id").asLong();
+        String respuesta = mvc.perform(conToken(post("/api/proveedores"), token("admin"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"razonSocial\":\"Proveedor Auditado S.A.\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Long proveedorId = json.readTree(respuesta).get("id").asLong();
+        assertThat(proveedorService.obtener(proveedorId).getActualizadoPor()).isEqualTo(adminId);
     }
 
     @Test

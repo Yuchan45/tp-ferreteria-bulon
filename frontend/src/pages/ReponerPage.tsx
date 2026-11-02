@@ -6,15 +6,14 @@ import type { EstadoStock, ProductoProveedor } from '@/api/types'
 import { StockBadge } from '@/components/badges'
 import { Aviso, CeldaProducto, ErrorCarga, EstadoVacio, SearchField, TablaCargando, Toolbar } from '@/components/common'
 import { useRegistrarMovimiento } from '@/components/dialogs/registrar-context'
+import { ExportarReporte } from '@/components/ExportarReporte'
+import { FiltroEstado } from '@/components/FiltroEstado'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useSesion } from '@/hooks/auth-context'
 import { useApi } from '@/hooks/useApi'
 import { fmtNumero, fmtPrecio, incluye } from '@/lib/format'
 import { faltante, porUrgencia } from '@/lib/stock'
-
-const TODOS = 'todos'
 
 export function ReponerPage() {
   const navigate = useNavigate()
@@ -34,7 +33,7 @@ export function ReponerPage() {
     [sucursal.id],
   )
   const [busqueda, setBusqueda] = useState('')
-  const [estado, setEstado] = useState<EstadoStock | typeof TODOS>(TODOS)
+  const [estado, setEstado] = useState<EstadoStock | null>(null)
 
   if (filas.error) return <ErrorCarga error={filas.error} onRetry={filas.reload} />
   if (!filas.data) return <TablaCargando filas={6} columnas={7} />
@@ -56,10 +55,10 @@ export function ReponerPage() {
       />
     )
 
-  const lista = [...filas.data]
-    .filter((s) => !busqueda || incluye(s.codigo, busqueda) || incluye(s.nombre, busqueda))
-    .filter((s) => estado === TODOS || s.estado === estado)
-    .sort(porUrgencia)
+  const coinciden = filas.data.filter((s) => !busqueda || incluye(s.codigo, busqueda) || incluye(s.nombre, busqueda))
+  const lista = coinciden.filter((s) => !estado || s.estado === estado).sort(porUrgencia)
+  // Las cantidades del filtro respetan la búsqueda
+  const contar = (e: EstadoStock | null) => (e ? coinciden.filter((s) => s.estado === e).length : coinciden.length)
 
   return (
     <>
@@ -68,16 +67,9 @@ export function ReponerPage() {
       </Aviso>
       <Toolbar>
         <SearchField value={busqueda} onChange={setBusqueda} placeholder="Buscar por código o nombre" />
-        <Select value={estado} onValueChange={(v) => setEstado(v as EstadoStock)}>
-          <SelectTrigger className="w-44" aria-label="Filtrar por estado">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectItem value={TODOS}>Estado: Todos</SelectItem>
-            <SelectItem value="CRITICO">Crítico</SelectItem>
-            <SelectItem value="REPONER">A reponer</SelectItem>
-          </SelectContent>
-        </Select>
+        <FiltroEstado estados={['CRITICO', 'REPONER']} value={estado} onChange={setEstado} contar={contar} tamano="md" />
+        <div className="flex-1" />
+        <ExportarReporte tipo="a-reponer" filtros={{ sucursalId: sucursal.id, estado, q: busqueda }} />
       </Toolbar>
 
       <div className="overflow-hidden rounded-lg border bg-card">

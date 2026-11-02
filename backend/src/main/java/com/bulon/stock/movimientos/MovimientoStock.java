@@ -62,8 +62,4 @@ public class MovimientoStock {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "proveedor_id")
     private Proveedor proveedor;
-
-    /** Solicitud de reposición que originó el ingreso, si la hay. */
-    @Column(name = "solicitud_id")
-    private Long solicitudId;
 }

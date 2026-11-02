@@ -1,7 +1,8 @@
 package com.bulon.stock.seed;
 
 import com.bulon.stock.categorias.CategoriaService;
-import com.bulon.stock.movimientos.MovimientoStockDTO;
+import com.bulon.stock.movimientos.FiltroMovimientos;
+import com.bulon.stock.movimientos.MovimientoDetalleDTO;
 import com.bulon.stock.movimientos.MovimientoStockService;
 import com.bulon.stock.movimientos.TipoMovimiento;
 import com.bulon.stock.productos.ProductoDTO;
@@ -95,7 +96,7 @@ class DataSeederTests {
     @Test
     void elStockDeCadaProductoCoincideConSusMovimientos() {
         for (ProductoDTO producto : productoService.listar()) {
-            BigDecimal segunMovimientos = movimientoService.listarPorProducto(producto.id(), null).stream()
+            BigDecimal segunMovimientos = movimientoService.listar(FiltroMovimientos.deProducto(producto.id())).stream()
                     .map(DataSeederTests::efecto)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             assertThat(producto.stockTotal()).as(producto.codigo()).isEqualByComparingTo(segunMovimientos);
@@ -105,8 +106,8 @@ class DataSeederTests {
     @Test
     void registraUnMovimientoDeCadaTipo() {
         List<TipoMovimiento> tipos = productoService.listar().stream()
-                .flatMap(p -> movimientoService.listarPorProducto(p.id(), null).stream())
-                .map(MovimientoStockDTO::tipo)
+                .flatMap(p -> movimientoService.listar(FiltroMovimientos.deProducto(p.id())).stream())
+                .map(MovimientoDetalleDTO::tipo)
                 .distinct()
                 .toList();
         assertThat(tipos).containsExactlyInAnyOrder(TipoMovimiento.values());
@@ -132,7 +133,7 @@ class DataSeederTests {
         assertThat(productoService.listar()).hasSize(27);
     }
 
-    private static BigDecimal efecto(MovimientoStockDTO m) {
+    private static BigDecimal efecto(MovimientoDetalleDTO m) {
         return switch (m.tipo()) {
             case SALIDA_VENTA, DEVOLUCION_PROVEEDOR, ROTURA -> m.cantidad().negate();
             default -> m.cantidad();

@@ -10,7 +10,7 @@ import { useSesion } from '@/hooks/auth-context'
 import { useApi } from '@/hooks/useApi'
 import { useMovimientosGlobales } from '@/hooks/useMovimientosGlobales'
 import { esHoy, fmtDelta, fmtHora, fmtNumero } from '@/lib/format'
-import { delta, faltante, porUrgencia } from '@/lib/stock'
+import { faltante, porUrgencia } from '@/lib/stock'
 
 export function PanelPage() {
   const navigate = useNavigate()
@@ -21,12 +21,13 @@ export function PanelPage() {
   if (stock.error) return <ErrorCarga error={stock.error} onRetry={stock.reload} />
 
   const lista = stock.data ?? []
-  const aReponer = lista.filter((s) => s.estado === 'REPONER').length
-  const criticos = lista.filter((s) => s.estado === 'CRITICO').length
+  // Los críticos también están por debajo del punto de pedido: "A reponer" los incluye
   const alertas = lista.filter((s) => s.estado !== 'OK').sort(porUrgencia)
+  const aReponer = alertas.length
+  const criticos = lista.filter((s) => s.estado === 'CRITICO').length
   const hoy = (movimientos.data ?? []).filter((m) => esHoy(m.fecha))
-  const ingresosHoy = hoy.filter((m) => delta(m.tipo, m.cantidad) > 0).length
-  const salidasHoy = hoy.filter((m) => delta(m.tipo, m.cantidad) < 0).length
+  const ingresosHoy = hoy.filter((m) => m.efecto > 0).length
+  const salidasHoy = hoy.filter((m) => m.efecto < 0).length
   const cargando = stock.loading && !stock.data
   const valor = (n: number) => (cargando ? <Skeleton className="h-9 w-14 bg-muted" /> : fmtNumero(n))
 
@@ -98,12 +99,12 @@ export function PanelPage() {
                 <li key={m.id} className="flex items-center gap-3 py-3">
                   <MovimientoBadge tipo={m.tipo} />
                   <Link to={`/productos/${m.productoId}`} className="min-w-0 flex-1 hover:underline">
-                    <p className="truncate">{m.producto.nombre}</p>
+                    <p className="truncate">{m.nombre}</p>
                     <p className="text-[13px] text-muted-foreground">
-                      {m.producto.codigo} · {esHoy(m.fecha) ? fmtHora(m.fecha) : new Date(m.fecha).toLocaleDateString('es-AR')}
+                      {m.codigo} · {esHoy(m.fecha) ? fmtHora(m.fecha) : new Date(m.fecha).toLocaleDateString('es-AR')}
                     </p>
                   </Link>
-                  <span className="tabular font-medium">{fmtDelta(delta(m.tipo, m.cantidad))}</span>
+                  <span className="tabular font-medium">{fmtDelta(m.efecto)}</span>
                 </li>
               ))}
               {movimientos.loading && !movimientos.data && Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="my-3 h-10 bg-muted" />)}

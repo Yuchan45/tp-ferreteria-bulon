@@ -7,6 +7,7 @@ import type { EstadoStock } from '@/api/types'
 import { StockBadge } from '@/components/badges'
 import { ErrorCarga, EstadoVacio, POR_PAGINA, Paginacion, SearchField, TablaCargando, Toolbar } from '@/components/common'
 import { ProductoDialog } from '@/components/dialogs/ProductoDialog'
+import { ExportarReporte } from '@/components/ExportarReporte'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -71,6 +72,15 @@ export function ProductosPage() {
           </SelectContent>
         </Select>
         <div className="flex-1" />
+        <ExportarReporte
+          tipo="stock"
+          filtros={{
+            sucursalId: sucursal.id,
+            categoriaId: categoria === TODOS ? null : Number(categoria),
+            estado: estado === TODOS ? null : estado,
+            q: busqueda,
+          }}
+        />
         {esAdmin && (
           <Button onClick={() => setNuevo((n) => n + 1)}>
             <Plus /> Nuevo producto

@@ -1,4 +1,18 @@
-import type { Movimiento, StockSucursal, TipoMovimiento } from '@/api/types'
+import type { EstadoStock, StockSucursal, TipoMovimiento } from '@/api/types'
+
+/** Color de cada estado de stock (el punto que se usa en listas y filtros). */
+export const PUNTO_ESTADO: Record<EstadoStock, string> = {
+  OK: 'bg-stock-ok',
+  REPONER: 'bg-stock-low',
+  CRITICO: 'bg-stock-out',
+}
+
+/** Nombre de cada estado en los filtros. */
+export const ESTADO_LABEL: Record<EstadoStock, string> = {
+  OK: 'Normal',
+  REPONER: 'A reponer',
+  CRITICO: 'Crítico',
+}
 
 /** Cuánto falta para volver al punto de pedido. */
 export const faltante = (s: Pick<StockSucursal, 'cantidad' | 'puntoPedido'>) => Math.max(s.puntoPedido - s.cantidad, 0)
@@ -29,25 +43,6 @@ export const requiereProveedor = (tipo: TipoMovimiento) => tipo === 'INGRESO_COM
 
 export const requiereMotivo = (tipo: TipoMovimiento) =>
   tipo === 'AJUSTE' || tipo === 'ROTURA' || tipo === 'DEVOLUCION_CLIENTE' || tipo === 'DEVOLUCION_PROVEEDOR'
-
-export interface MovimientoConStock extends Movimiento {
-  /** Stock de la sucursal inmediatamente después del movimiento. */
-  stockResultante: number
-}
-
-/**
- * El backend no guarda el stock resultante de cada movimiento: se reconstruye
- * hacia atrás partiendo del stock actual de la sucursal. `movimientos` debe venir del
- * más reciente al más antiguo (como lo devuelve GET /movimientos).
- */
-export function conStockResultante(movimientos: Movimiento[], stockActual: number): MovimientoConStock[] {
-  let stock = stockActual
-  return movimientos.map((m) => {
-    const fila = { ...m, stockResultante: stock }
-    stock = redondear(stock - delta(m.tipo, m.cantidad))
-    return fila
-  })
-}
 
 /** Evita errores de coma flotante con cantidades de hasta 3 decimales. */
 export const redondear = (n: number) => Math.round(n * 1000) / 1000
