@@ -11,6 +11,7 @@ import { ProductoDetallePage } from '@/pages/ProductoDetallePage'
 import { ProductosPage } from '@/pages/ProductosPage'
 import { ProveedoresPage } from '@/pages/ProveedoresPage'
 import { ReponerPage } from '@/pages/ReponerPage'
+import { ReportesPage } from '@/pages/ReportesPage'
 import { UsuariosPage } from '@/pages/UsuariosPage'
 
 const titulo = (title: string): RouteHandle => ({ title })
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: 'reponer', element: <ReponerPage />, handle: titulo('A reponer') },
       { path: 'movimientos', element: <MovimientosPage />, handle: titulo('Movimientos') },
       { path: 'proveedores', element: <ProveedoresPage />, handle: titulo('Proveedores') },
+      { path: 'reportes', element: <ReportesPage />, handle: titulo('Reportes') },
       // Solo administradores
       { path: 'usuarios', element: <RequireAdmin><UsuariosPage /></RequireAdmin>, handle: titulo('Usuarios') },
       { path: '*', element: <EstadoVacio titulo="Página no encontrada" descripcion="La dirección no corresponde a ninguna vista." />, handle: titulo('No encontrado') },

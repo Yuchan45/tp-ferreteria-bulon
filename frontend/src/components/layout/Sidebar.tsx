@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  FileChartColumn,
   LayoutDashboard,
   LogOut,
   Package,
@@ -23,6 +24,7 @@ const ITEMS: { to: string; label: string; icon: LucideIcon; end?: boolean; conta
   { to: '/reponer', label: 'A reponer', icon: TriangleAlert, contador: true },
   { to: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
   { to: '/proveedores', label: 'Proveedores', icon: Truck },
+  { to: '/reportes', label: 'Reportes', icon: FileChartColumn },
   { to: '/usuarios', label: 'Usuarios', icon: Users, soloAdmin: true },
 ]
 

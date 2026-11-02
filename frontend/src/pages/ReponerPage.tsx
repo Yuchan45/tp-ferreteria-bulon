@@ -6,6 +6,7 @@ import type { EstadoStock, ProductoProveedor } from '@/api/types'
 import { StockBadge } from '@/components/badges'
 import { Aviso, CeldaProducto, ErrorCarga, EstadoVacio, SearchField, TablaCargando, Toolbar } from '@/components/common'
 import { useRegistrarMovimiento } from '@/components/dialogs/registrar-context'
+import { ExportarReporte } from '@/components/ExportarReporte'
 import { FiltroEstado } from '@/components/FiltroEstado'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -67,6 +68,8 @@ export function ReponerPage() {
       <Toolbar>
         <SearchField value={busqueda} onChange={setBusqueda} placeholder="Buscar por código o nombre" />
         <FiltroEstado estados={['CRITICO', 'REPONER']} value={estado} onChange={setEstado} contar={contar} tamano="md" />
+        <div className="flex-1" />
+        <ExportarReporte tipo="a-reponer" filtros={{ sucursalId: sucursal.id, estado, q: busqueda }} />
       </Toolbar>
 
       <div className="overflow-hidden rounded-lg border bg-card">

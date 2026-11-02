@@ -16,6 +16,7 @@ src/main/java/com/bulon/stock/
 ├── stock/                 # Stock por producto y sucursal, umbrales y productos a reponer
 ├── alertas/               # Alertas de reposición: observan el stock (Observer)
 ├── notificaciones/        # Avisos in-app: observan las alertas (Observer)
+├── reportes/              # Reportes PDF / Excel: ExportadorReporte + adaptadores (Adapter)
 │   └── canales/           # Decorator: NotificadorSistema (campanita) + ConEmail
 ├── movimientos/           # Compras, ventas, devoluciones, roturas y ajustes
 │   └── estrategias/       # Strategy (reglas de cada tipo) + Simple Factory (FabricaMovimientos)
@@ -130,6 +131,9 @@ empleados y los administradores se darían de alta desde `POST /api/usuarios`.
 | GET    | `/api/alertas?sucursalId=`               | 👤 | Alertas activas, primero las críticas (`sucursalId` opcional) |
 | GET    | `/api/notificaciones`                    | 👤 | `{noLeidas, notificaciones}`: las últimas 30 del usuario del token |
 | PUT    | `/api/notificaciones/{id}/leida`, `/api/notificaciones/leidas` | 👤 | Marcar una / todas como leídas (solo las propias) |
+| GET    | `/api/reportes/stock?sucursalId=&formato=&categoriaId=&estado=&q=` | 👤 | Stock por sucursal |
+| GET    | `/api/reportes/movimientos?sucursalId=&formato=&desde=&hasta=&tipo=&q=` | 👤 | Movimientos de un período (`desde`/`hasta` en `yyyy-mm-dd`, ambos incluidos) |
+| GET    | `/api/reportes/a-reponer?sucursalId=&formato=&estado=&q=` | 👤 | Productos a reponer, con faltante, proveedor preferido y costo estimado |
 | GET    | `/api/stock?sucursalId=`                 | 👤 | Stock de todos los productos en una sucursal |
 | GET    | `/api/movimientos?productoId=&sucursalId=` | 👤 | Historial de un producto (`sucursalId` opcional) |
 | POST   | `/api/movimientos`                       | 👤 | Registrar un movimiento |
@@ -169,6 +173,20 @@ movimiento o cambio de umbrales → StockService (Subject)
   El email es **simulado**: se escribe en el log `[EMAIL] a ventas@bulon.com.ar: Stock crítico: …`.
   Un usuario sin email recibe solo la campanita.
 - Al arrancar, el backend revisa todo el stock para que las alertas coincidan con los datos.
+
+### Reportes (patrón Adapter)
+
+`formato` es `pdf` (por defecto) o `excel`; los demás filtros son opcionales. La respuesta es el
+archivo con `Content-Disposition: attachment` (por ejemplo `stock-suc-01-2026-11-02.pdf`).
+
+```
+ReporteService ── arma un Reporte (título, filtros, columnas, filas, resumen), sin saber de formatos
+   └─ ExportadorReporte (Target) ── elegido por formato
+         ├─ PdfReporteAdapter   → OpenPDF (Document, PdfPTable…)
+         └─ ExcelReporteAdapter → Apache POI (Workbook, Sheet, Cell…)
+```
+
+Sumar un formato (por ejemplo CSV) es agregar otro adaptador; los reportes no cambian.
 
 Errores: `401` sin sesión o credenciales inválidas · `403` rol sin permiso · `404` recurso
 inexistente · `422` regla de negocio · `400` validación · `409` conflicto.

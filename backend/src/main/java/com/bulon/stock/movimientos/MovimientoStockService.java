@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -37,6 +39,22 @@ public class MovimientoStockService {
                 ? movimientoRepository.findByProductoIdOrderByFechaDescIdDesc(productoId)
                 : movimientoRepository.findByProductoIdAndSucursalIdOrderByFechaDescIdDesc(productoId, sucursalId);
         return movimientos.stream().map(MovimientoStockDTO::from).toList();
+    }
+
+    /**
+     * Uso interno de los reportes: los movimientos de una sucursal entre dos días (ambos
+     * incluidos), con tipo opcional. Trae producto, usuario y proveedor ya cargados.
+     */
+    public List<MovimientoStock> listarDeSucursal(Long sucursalId, LocalDate desde, LocalDate hasta, TipoMovimiento tipo) {
+        return movimientoRepository.findDeSucursal(sucursalId,
+                desde != null ? desde.atStartOfDay() : null,
+                hasta != null ? hasta.plusDays(1).atStartOfDay() : null,
+                tipo);
+    }
+
+    /** Cuánto cambió el stock con este movimiento (+ ingreso, − salida), según su estrategia. */
+    public BigDecimal efecto(MovimientoStock movimiento) {
+        return fabrica.estrategiaPara(movimiento.getTipo()).delta(movimiento.getCantidad());
     }
 
     /**

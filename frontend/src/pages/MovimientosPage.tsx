@@ -3,6 +3,7 @@ import { ArrowLeftRight } from 'lucide-react'
 import { Link } from 'react-router'
 import type { TipoMovimiento } from '@/api/types'
 import { FiltroTipoMovimiento, MovimientoBadge } from '@/components/badges'
+import { ExportarReporte } from '@/components/ExportarReporte'
 import { CeldaProducto, ErrorCarga, EstadoVacio, POR_PAGINA, Paginacion, SearchField, TablaCargando, Toolbar } from '@/components/common'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -49,7 +50,12 @@ export function MovimientosPage() {
         <div className="flex-1" />
         {movimientos.data && <span className="text-[13px] text-muted-foreground">{fmtNumero(filtrados.length)} movimientos en el período</span>}
       </Toolbar>
-      <FiltroTipoMovimiento value={tipo} onChange={filtrar(setTipo)} contar={contar} />
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <FiltroTipoMovimiento value={tipo} onChange={filtrar(setTipo)} contar={contar} />
+        </div>
+        <ExportarReporte tipo="movimientos" filtros={{ sucursalId: sucursal.id, desde, hasta, tipo, q: busqueda }} />
+      </div>
 
       {movimientos.error ? (
         <ErrorCarga error={movimientos.error} onRetry={movimientos.reload} />

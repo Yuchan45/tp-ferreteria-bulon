@@ -12,6 +12,7 @@ Trabajo práctico de **Proceso de Desarrollo de Software** — UADE · Grupo 6.
 |---------------|--------------------------------------------------------------|
 | Frontend      | React 19 + TypeScript + Vite                                 |
 | Backend       | Java 21 + Spring Boot 3.5 (Web, Data JPA, Validation, Actuator) |
+| Reportes      | OpenPDF (PDF) y Apache POI (Excel)                           |
 | Base de datos | SQL Server 2022 (Docker) + migraciones con Flyway            |
 | Tests         | JUnit 5 + H2 en memoria                                      |
 
@@ -46,6 +47,7 @@ ferreteria-bulon/
 │   │   ├── stock/               # Stock por sucursal y reposición
 │   │   ├── alertas/             # Alertas de reposición (observan el stock)
 │   │   ├── notificaciones/      # Avisos in-app (observan las alertas)
+│   │   ├── reportes/            # Reportes en PDF y Excel
 │   │   ├── movimientos/         # Compras, ventas, devoluciones, roturas y ajustes
 │   │   ├── proveedores/
 │   │   ├── usuarios/            # Usuarios y roles
@@ -131,6 +133,7 @@ cd frontend && npm run build && npm run lint
 | GET      | `/api/productos/bajo-stock`    | Productos que hay que reponer        |
 | GET      | `/api/alertas`                 | Alertas de reposición activas        |
 | GET/PUT  | `/api/notificaciones`          | Notificaciones del usuario / marcarlas como leídas |
+| GET      | `/api/reportes/{stock,movimientos,a-reponer}` | Descargar un reporte en PDF o Excel |
 | GET      | `/api/movimientos?productoId=` | Historial de movimientos             |
 | POST     | `/api/movimientos`             | Registrar compra, venta, devolución, rotura o ajuste |
 | GET/POST | `/api/proveedores`             | Listar / crear proveedores           |
@@ -151,7 +154,7 @@ Patrones definidos en la Entrega 2 ([informe](docs/informes/)) y su estado de im
 | Strategy       | Comportamiento | Validación y efecto sobre el stock de cada movimiento  | Implementado (`movimientos/estrategias/`, una clase por tipo) |
 | Observer       | Comportamiento | Aviso de stock mínimo a distintos interesados          | Implementado (`stock/StockObserver` → `alertas/` → `notificaciones/`) |
 | Decorator      | Estructural    | Combinación de canales de notificación de alertas      | Implementado (`notificaciones/canales/`: campanita + email según el nivel) |
-| Adapter        | Estructural    | Exportación de reportes a PDF / Excel                  | Pendiente |
+| Adapter        | Estructural    | Exportación de reportes a PDF / Excel                  | Implementado (`reportes/`: `ExportadorReporte` + adaptadores de OpenPDF y Apache POI) |
 
 ## Base de datos
 

@@ -54,20 +54,50 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(0, 'No se pudo conectar con el servidor.')
   }
 
-  if (!res.ok) {
-    let detail: string | undefined
-    try {
-      const body = (await res.json()) as { detail?: string }
-      detail = body.detail
-    } catch {
-      // respuesta sin cuerpo JSON
-    }
-    if (res.status === 401 && token && !path.startsWith('/auth/')) alExpirar?.()
-    throw new ApiError(res.status, detail ?? MENSAJES_POR_ESTADO[res.status] ?? `Error ${res.status}`)
-  }
+  if (!res.ok) throw await errorDe(res, path)
 
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
+}
+
+/** ApiError con el `detail` del ProblemDetail; un 401 con sesión iniciada la cierra. */
+async function errorDe(res: Response, path: string) {
+  let detail: string | undefined
+  try {
+    const body = (await res.json()) as { detail?: string }
+    detail = body.detail
+  } catch {
+    // respuesta sin cuerpo JSON
+  }
+  if (res.status === 401 && token && !path.startsWith('/auth/')) alExpirar?.()
+  return new ApiError(res.status, detail ?? MENSAJES_POR_ESTADO[res.status] ?? `Error ${res.status}`)
+}
+
+/**
+ * Descarga un archivo de la API (p. ej. un reporte) con el token de la sesión y lo guarda
+ * con el nombre que indica el backend en Content-Disposition.
+ */
+export async function descargar(path: string, nombrePorDefecto: string) {
+  let res: Response
+  try {
+    // Un reporte grande puede tardar más que una consulta común
+    res = await fetch(`/api${path}`, {
+      signal: AbortSignal.timeout(60_000),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+  } catch {
+    throw new ApiError(0, 'No se pudo conectar con el servidor.')
+  }
+  if (!res.ok) throw await errorDe(res, path)
+
+  const disposicion = res.headers.get('Content-Disposition') ?? ''
+  const nombre = /filename\*=UTF-8''([^;]+)/i.exec(disposicion)?.[1] ?? /filename="?([^";]+)"?/i.exec(disposicion)?.[1]
+  const url = URL.createObjectURL(await res.blob())
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = nombre ? decodeURIComponent(nombre) : nombrePorDefecto
+  enlace.click()
+  URL.revokeObjectURL(url)
 }
 
 export const post = <T>(path: string, body: unknown) =>
