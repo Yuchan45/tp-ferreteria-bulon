@@ -49,9 +49,9 @@ src/
 | `/productos/:id`  | Detalle de producto  | Todos | Stock, umbrales, proveedor preferido e historial |
 | `/reponer`        | A reponer            | Todos | `GET /productos/bajo-stock`; "Registrar compra" precarga el faltante |
 | `/movimientos`    | Movimientos          | Todos | Historial global, ver nota |
-| `/proveedores`    | Proveedores          | Todos | Alta solo para administradores |
+| `/proveedores`    | Proveedores          | Todos | Alta, edición y activar / desactivar solo para administradores |
 | `/reportes`       | Reportes             | Todos | Stock, movimientos y a reponer en PDF o Excel |
-| `/usuarios`       | Usuarios             | Administrador | |
+| `/usuarios`       | Usuarios             | Administrador | Alta, edición (rol, sucursal, contraseña) y activar / desactivar |
 
 "Registrar movimiento" se abre desde la barra superior y desde cada vista; el producto se elige
 con un buscador (por código o nombre) y un filtro por estado. Después de guardar cualquier
@@ -63,10 +63,11 @@ generarse una alerta de reposición); se consulta cada 30 segundos y después de
 
 **Notas sobre los datos**
 
-- **Historial global:** el backend solo expone `GET /movimientos?productoId=`, así que la vista
-  Movimientos (y los "Últimos movimientos" del panel) consulta el historial de cada producto y los
-  combina. Cuando exista un `GET /movimientos` global alcanza con cambiar `useMovimientosGlobales`.
-- **Stock resultante:** el backend no lo guarda; se reconstruye hacia atrás desde el stock actual.
+- **Historial global:** la vista Movimientos y los "Últimos movimientos" del panel piden el
+  historial de la sucursal en una sola llamada (`GET /movimientos?sucursalId=`). Los filtros de
+  la vista (fechas, tipo, búsqueda) se aplican en el cliente para poder contar cada tipo.
+- **Stock resultante:** lo calcula el backend (no se guarda: se reconstruye hacia atrás desde el
+  stock actual) y llega en cada movimiento junto con su `efecto` con signo.
 
 ## Solo datos reales
 

@@ -60,8 +60,11 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
     (signal) => (productoId ? proveedoresDeProducto(Number(productoId), signal) : Promise.resolve([])),
     [productoId],
   )
-  // Por defecto, el proveedor preferido del producto
-  const proveedorId = proveedorElegido || String(proveedores.data?.find((p) => p.preferido)?.proveedorId ?? '')
+  // A un proveedor inactivo no se le compra (devolverle mercadería sí se puede)
+  const opcionesProveedor = (proveedores.data ?? []).filter((p) => tipo !== 'INGRESO_COMPRA' || p.activo !== false)
+  // Por defecto, el proveedor preferido del producto (si se puede usar para este tipo)
+  const elegidoValido = opcionesProveedor.some((p) => String(p.proveedorId) === proveedorElegido)
+  const proveedorId = elegidoValido ? proveedorElegido : String(opcionesProveedor.find((p) => p.preferido)?.proveedorId ?? '')
 
   const n = aNumero(cantidad)
   const conProveedor = requiereProveedor(tipo)
@@ -199,7 +202,7 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
               <SelectValue placeholder={productoId ? 'Elegí el proveedor' : 'Primero elegí el producto'} />
             </SelectTrigger>
             <SelectContent position="popper">
-              {proveedores.data?.map((p) => (
+              {opcionesProveedor.map((p) => (
                 <SelectItem key={p.proveedorId} value={String(p.proveedorId)}>
                   {p.razonSocial}
                   {p.preferido ? ' (preferido)' : ''}

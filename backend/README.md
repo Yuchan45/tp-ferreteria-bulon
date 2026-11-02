@@ -136,10 +136,12 @@ empleados y los administradores se darían de alta desde `POST /api/usuarios`.
 | GET    | `/api/reportes/movimientos?sucursalId=&formato=&desde=&hasta=&tipo=&q=` | 👤 | Movimientos de un período (`desde`/`hasta` en `yyyy-mm-dd`, ambos incluidos) |
 | GET    | `/api/reportes/a-reponer?sucursalId=&formato=&estado=&q=` | 👤 | Productos a reponer, con faltante, proveedor preferido y costo estimado |
 | GET    | `/api/stock?sucursalId=`                 | 👤 | Stock de todos los productos en una sucursal |
-| GET    | `/api/movimientos?productoId=&sucursalId=` | 👤 | Historial de un producto (`sucursalId` opcional) |
+| GET    | `/api/movimientos?productoId=&sucursalId=&desde=&hasta=&tipo=&q=` | 👤 | Historial de un producto, de una sucursal o de ambos, con el stock resultante de cada movimiento (ver abajo) |
 | POST   | `/api/movimientos`                       | 👤 | Registrar un movimiento |
 | GET / POST | `/api/proveedores`                   | 👤 / 🔑 | Listar / crear proveedores |
+| PUT    | `/api/proveedores/{id}`                  | 🔑 | Editar un proveedor y activarlo o desactivarlo (`activo`) |
 | GET/POST | `/api/usuarios`                        | 🔑 | Listar / crear usuarios (la API nunca devuelve la contraseña) |
+| PUT    | `/api/usuarios/{id}`                     | 🔑 | Editar un usuario, activarlo o desactivarlo y, si se envía `password`, resetear su contraseña |
 
 ### Reglas al registrar un movimiento
 
@@ -152,6 +154,24 @@ empleados y los administradores se darían de alta desde `POST /api/usuarios`.
 - Solo los productos por metro, kilo o litro admiten decimales.
 - El stock no puede quedar negativo. Si dos operaciones cambian el mismo stock a la vez, la
   segunda recibe `409` (bloqueo optimista).
+
+### Historial de movimientos
+
+`GET /api/movimientos` necesita `productoId`, `sucursalId` o ambos; `desde` y `hasta`
+(`yyyy-mm-dd`, ambos días incluidos), `tipo` y `q` (código o nombre del producto, sin
+mayúsculas ni acentos) son opcionales. Devuelve del más reciente al más antiguo, con el
+producto, el responsable, el proveedor, el `efecto` con signo y el `stockResultante`. El stock
+resultante no se guarda: se reconstruye hacia atrás desde el stock actual. La vista
+Movimientos y el reporte de movimientos usan esta misma consulta.
+
+### Edición de usuarios y proveedores
+
+- Un **usuario desactivado** no puede iniciar sesión, no recibe notificaciones y no puede
+  registrar movimientos. El username no se cambia; la contraseña solo si se envía una nueva.
+- Un administrador no puede desactivarse ni quitarse el rol a sí mismo, y siempre tiene que
+  quedar al menos un administrador activo.
+- A un **proveedor desactivado** no se le registran compras (devolverle mercadería sí); su
+  historial se conserva.
 
 ### Alertas y notificaciones (patrón Observer)
 

@@ -12,7 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useSesion } from '@/hooks/auth-context'
 import { useApi } from '@/hooks/useApi'
 import { TIPO_LABEL, UNIDAD_LABEL, fmtDelta, fmtFechaHora, fmtNumero, fmtPrecio } from '@/lib/format'
-import { conStockResultante, delta } from '@/lib/stock'
 
 export function ProductoDetallePage() {
   const id = Number(useParams().id)
@@ -21,7 +20,7 @@ export function ProductoDetallePage() {
   const producto = useApi((signal) => obtenerProducto(id, signal), [id])
   const stock = useApi((signal) => stockDeProducto(id, signal), [id])
   const proveedores = useApi((signal) => proveedoresDeProducto(id, signal), [id])
-  const movimientos = useApi((signal) => listarMovimientos(id, sucursal.id, signal), [id, sucursal.id])
+  const movimientos = useApi((signal) => listarMovimientos({ productoId: id, sucursalId: sucursal.id }, signal), [id, sucursal.id])
   const [editar, setEditar] = useState(0)
 
   if (producto.error) return <ErrorCarga error={producto.error} onRetry={producto.reload} />
@@ -30,7 +29,7 @@ export function ProductoDetallePage() {
   const p = producto.data
   const fila = stock.data?.find((s) => s.sucursalId === sucursal.id)
   const preferido = proveedores.data?.find((pr) => pr.preferido)
-  const historial = movimientos.data && fila ? conStockResultante(movimientos.data, fila.cantidad) : undefined
+  const historial = movimientos.data
   const sobrePedido = fila ? fila.cantidad - fila.puntoPedido : 0
 
   return (
@@ -134,7 +133,7 @@ export function ProductoDetallePage() {
                   <TableCell>
                     <MovimientoBadge tipo={m.tipo} />
                   </TableCell>
-                  <TableCell className="tabular text-right font-medium">{fmtDelta(delta(m.tipo, m.cantidad))}</TableCell>
+                  <TableCell className="tabular text-right font-medium">{fmtDelta(m.efecto)}</TableCell>
                   <TableCell className="tabular text-right">{fmtNumero(m.stockResultante)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {[m.motivo ?? m.observaciones, m.referencia].filter(Boolean).join(' · ') || TIPO_LABEL[m.tipo]}

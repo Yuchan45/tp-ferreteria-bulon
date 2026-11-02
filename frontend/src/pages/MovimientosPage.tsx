@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useSesion } from '@/hooks/auth-context'
 import { useMovimientosGlobales } from '@/hooks/useMovimientosGlobales'
 import { diaLocal, fmtDelta, fmtFechaHora, fmtNumero, incluye } from '@/lib/format'
-import { delta } from '@/lib/stock'
 
 export function MovimientosPage() {
   const { sucursal } = useSesion()
@@ -27,7 +26,7 @@ export function MovimientosPage() {
     return (
       (!desde || dia >= desde) &&
       (!hasta || dia <= hasta) &&
-      (!busqueda || incluye(m.producto.codigo, busqueda) || incluye(m.producto.nombre, busqueda))
+      (!busqueda || incluye(m.codigo, busqueda) || incluye(m.nombre, busqueda))
     )
   })
   const filtrados = enPeriodo.filter((m) => !tipo || m.tipo === tipo)
@@ -83,13 +82,13 @@ export function MovimientosPage() {
                     <TableCell className="pl-4 text-muted-foreground">{fmtFechaHora(m.fecha)}</TableCell>
                     <TableCell>
                       <Link to={`/productos/${m.productoId}`} className="hover:underline">
-                        <CeldaProducto descripcion={m.producto.nombre} codigo={m.producto.codigo} peso="normal" />
+                        <CeldaProducto descripcion={m.nombre} codigo={m.codigo} peso="normal" />
                       </Link>
                     </TableCell>
                     <TableCell>
                       <MovimientoBadge tipo={m.tipo} />
                     </TableCell>
-                    <TableCell className="tabular text-right font-medium">{fmtDelta(delta(m.tipo, m.cantidad))}</TableCell>
+                    <TableCell className="tabular text-right font-medium">{fmtDelta(m.efecto)}</TableCell>
                     <TableCell className="tabular text-right">{fmtNumero(m.stockResultante)}</TableCell>
                     <TableCell className="max-w-60 truncate text-muted-foreground">{[m.motivo ?? m.observaciones, m.referencia].filter(Boolean).join(' · ') || '—'}</TableCell>
                   </TableRow>

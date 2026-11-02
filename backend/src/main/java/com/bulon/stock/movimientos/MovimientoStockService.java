@@ -1,5 +1,6 @@
 package com.bulon.stock.movimientos;
 
+import com.bulon.stock.common.Busqueda;
 import com.bulon.stock.common.exception.BusinessException;
 import com.bulon.stock.movimientos.estrategias.EstrategiaMovimiento;
 import com.bulon.stock.movimientos.estrategias.FabricaMovimientos;
@@ -18,8 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -34,27 +37,46 @@ public class MovimientoStockService {
     private final StockService stockService;
     private final FabricaMovimientos fabrica;
 
-    public List<MovimientoStockDTO> listarPorProducto(Long productoId, Long sucursalId) {
-        List<MovimientoStock> movimientos = sucursalId == null
-                ? movimientoRepository.findByProductoIdOrderByFechaDescIdDesc(productoId)
-                : movimientoRepository.findByProductoIdAndSucursalIdOrderByFechaDescIdDesc(productoId, sucursalId);
-        return movimientos.stream().map(MovimientoStockDTO::from).toList();
-    }
-
     /**
-     * Uso interno de los reportes: los movimientos de una sucursal entre dos días (ambos
-     * incluidos), con tipo opcional. Trae producto, usuario y proveedor ya cargados.
+     * Historial de movimientos, del más reciente al más antiguo, con el stock que quedó
+     * después de cada uno. El stock resultante no se guarda: se reconstruye hacia atrás
+     * desde el stock actual de cada producto en cada sucursal. Por eso se recorre el
+     * historial completo y los filtros de fecha, tipo y búsqueda se aplican al final.
      */
-    public List<MovimientoStock> listarDeSucursal(Long sucursalId, LocalDate desde, LocalDate hasta, TipoMovimiento tipo) {
-        return movimientoRepository.findDeSucursal(sucursalId,
-                desde != null ? desde.atStartOfDay() : null,
-                hasta != null ? hasta.plusDays(1).atStartOfDay() : null,
-                tipo);
+    public List<MovimientoDetalleDTO> listar(FiltroMovimientos filtro) {
+        if (filtro.productoId() == null && filtro.sucursalId() == null) {
+            throw new BusinessException("Indicá un producto o una sucursal para ver sus movimientos");
+        }
+        Map<String, BigDecimal> stock = new HashMap<>();
+        (filtro.sucursalId() != null
+                ? stockService.listarPorSucursal(filtro.sucursalId())
+                : stockService.listarPorProducto(filtro.productoId()))
+                .forEach(s -> stock.put(clave(s.productoId(), s.sucursalId()), s.cantidad()));
+
+        List<MovimientoDetalleDTO> historial = new ArrayList<>();
+        for (MovimientoStock m : movimientoRepository.findHistorial(filtro.productoId(), filtro.sucursalId())) {
+            String clave = clave(m.getProducto().getId(), m.getSucursal().getId());
+            BigDecimal despues = stock.getOrDefault(clave, BigDecimal.ZERO);
+            BigDecimal efecto = efecto(m);
+            historial.add(MovimientoDetalleDTO.from(m, efecto, despues));
+            stock.put(clave, despues.subtract(efecto));   // lo que había antes de este movimiento
+        }
+
+        return historial.stream()
+                .filter(m -> filtro.desde() == null || !m.fecha().toLocalDate().isBefore(filtro.desde()))
+                .filter(m -> filtro.hasta() == null || !m.fecha().toLocalDate().isAfter(filtro.hasta()))
+                .filter(m -> filtro.tipo() == null || m.tipo() == filtro.tipo())
+                .filter(m -> Busqueda.coincide(filtro.q(), m.codigo(), m.nombre()))
+                .toList();
     }
 
     /** Cuánto cambió el stock con este movimiento (+ ingreso, − salida), según su estrategia. */
-    public BigDecimal efecto(MovimientoStock movimiento) {
+    private BigDecimal efecto(MovimientoStock movimiento) {
         return fabrica.estrategiaPara(movimiento.getTipo()).delta(movimiento.getCantidad());
+    }
+
+    private static String clave(Long productoId, Long sucursalId) {
+        return productoId + "/" + sucursalId;
     }
 
     /**
@@ -111,6 +133,11 @@ public class MovimientoStockService {
             throw new BusinessException("El proveedor " + dto.proveedorId()
                     + " no vende el producto " + producto.getCodigo());
         }
-        return proveedorService.obtener(dto.proveedorId());
+        Proveedor proveedor = proveedorService.obtener(dto.proveedorId());
+        // A un proveedor desactivado ya no se le compra; devolverle mercadería sí se puede
+        if (dto.tipo() == TipoMovimiento.INGRESO_COMPRA && !proveedor.isActivo()) {
+            throw new BusinessException("El proveedor " + proveedor.getRazonSocial() + " está inactivo");
+        }
+        return proveedor;
     }
 }

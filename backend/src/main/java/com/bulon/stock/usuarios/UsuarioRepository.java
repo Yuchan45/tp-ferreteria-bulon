@@ -21,4 +21,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByUsername(String username);
 
     boolean existsByEmailIgnoreCase(String email);
+
+    /** Otro usuario (distinto de {@code id}) ya usa ese email. */
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
+
+    long countByRolAndActivoTrue(Rol rol);
 }

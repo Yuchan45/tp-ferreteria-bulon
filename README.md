@@ -136,10 +136,10 @@ cd frontend && npm run build && npm run lint
 | GET      | `/api/alertas`                 | Alertas de reposición activas        |
 | GET/PUT  | `/api/notificaciones`          | Notificaciones del usuario / marcarlas como leídas |
 | GET      | `/api/reportes/{stock,movimientos,a-reponer}` | Descargar un reporte en PDF o Excel |
-| GET      | `/api/movimientos?productoId=` | Historial de movimientos             |
+| GET      | `/api/movimientos?sucursalId=` | Historial (de una sucursal o un producto, con filtros y stock resultante) |
 | POST     | `/api/movimientos`             | Registrar compra, venta, devolución, rotura o ajuste |
-| GET/POST | `/api/proveedores`             | Listar / crear proveedores           |
-| GET/POST | `/api/usuarios`                | Listar / crear usuarios              |
+| GET/POST/PUT | `/api/proveedores`         | Listar / crear / editar o desactivar proveedores |
+| GET/POST/PUT | `/api/usuarios`            | Listar / crear / editar o desactivar usuarios |
 
 Salvo `health`, `auth` y `sucursales`, todos exigen token; las altas y cambios de catálogo,
 proveedores y usuarios son solo para `ADMINISTRADOR`. Listado completo, permisos por endpoint y
@@ -181,6 +181,14 @@ columnas `solicitud_id` de alertas y movimientos y el estado `EN_GESTION` de las
 ahora solo pueden estar `ABIERTA` o `RESUELTA`). La reposición se registra como un ingreso por
 compra, que el botón "Registrar compra" de la vista A reponer precarga con el faltante y el
 proveedor preferido.
+
+También quedan afuera, por tiempo:
+
+- **Crear categorías desde la interfaz**: el endpoint `POST /api/categorias` existe (solo
+  administrador), pero no hay pantalla; las categorías son las que carga el seeder.
+- **Alta de sucursales y traslados entre ellas**: el modelo ya guarda el stock por sucursal
+  (preparado para N), pero hoy hay una sola sucursal y no hay ABM ni un tipo de movimiento de
+  traslado. Sumarlo sería una estrategia más (Strategy) y una pantalla de sucursales.
 
 ## Base de datos
 

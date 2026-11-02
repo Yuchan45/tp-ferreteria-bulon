@@ -270,7 +270,7 @@ public class DataSeeder implements ApplicationRunner {
 
             Long proveedorId = proveedorIds.get(seed.proveedor());
             productoService.asignarProveedor(producto.id(), proveedorId, new ProductoProveedorDTO(
-                    proveedorId, null, true, "P-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias()));
+                    proveedorId, null, true, "P-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias(), null));
 
             BigDecimal inicial = new BigDecimal(seed.stockInicial());
             if (inicial.signum() > 0) {
@@ -287,7 +287,7 @@ public class DataSeeder implements ApplicationRunner {
         for (AlternativoSeed seed : ALTERNATIVOS) {
             Long proveedorId = proveedorIds.get(seed.proveedor());
             productoService.asignarProveedor(productoIds.get(seed.codigo()), proveedorId, new ProductoProveedorDTO(
-                    proveedorId, null, false, "MO-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias()));
+                    proveedorId, null, false, "MO-" + seed.codigo(), new BigDecimal(seed.costo()), seed.plazoDias(), null));
         }
 
         for (MovimientoSeed seed : MOVIMIENTOS) {

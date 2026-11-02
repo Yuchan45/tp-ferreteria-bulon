@@ -18,6 +18,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -136,6 +138,45 @@ class MovimientoStockServiceTests {
         assertThatThrownBy(() -> movimientoService.registrar(
                 movimiento(tuerca.id(), vendedorId, TipoMovimiento.AJUSTE, "0", "Recuento", null)))
                 .hasMessageContaining("no puede ser 0");
+    }
+
+    @Test
+    void elHistorialDeLaSucursalTraeTodoEnUnaSolaConsultaConElStockResultante() {
+        ProductoDTO tornillo = producto("TOR-001");
+        movimientoService.registrar(movimiento(tornillo.id(), vendedorId, TipoMovimiento.SALIDA_VENTA, "100", null, null));
+
+        List<MovimientoDetalleDTO> historial = movimientoService.listar(FiltroMovimientos.deSucursal(sucursalId));
+
+        // El seeder registra 32 movimientos; más esta venta
+        assertThat(historial).hasSize(33);
+        MovimientoDetalleDTO ultimo = historial.getFirst();
+        assertThat(ultimo.codigo()).isEqualTo("TOR-001");
+        assertThat(ultimo.usuario()).isEqualTo("Vendedor de Mostrador");
+        assertThat(ultimo.efecto()).isEqualByComparingTo("-100");
+        // Después del último movimiento queda el stock actual; antes, 100 más
+        assertThat(ultimo.stockResultante()).isEqualByComparingTo(tornillo.stockTotal().subtract(new BigDecimal("100")));
+        MovimientoDetalleDTO anterior = historial.stream()
+                .filter(m -> m.codigo().equals("TOR-001") && !m.id().equals(ultimo.id()))
+                .findFirst().orElseThrow();
+        assertThat(anterior.stockResultante()).isEqualByComparingTo(tornillo.stockTotal());
+    }
+
+    @Test
+    void elHistorialSeFiltraPorTipoBusquedaYFecha() {
+        assertThat(movimientoService.listar(new FiltroMovimientos(null, sucursalId, null, null, TipoMovimiento.SALIDA_VENTA, null)))
+                .hasSize(2)
+                .allMatch(m -> m.tipo() == TipoMovimiento.SALIDA_VENTA);
+        assertThat(movimientoService.listar(new FiltroMovimientos(null, sucursalId, null, null, null, "lampara")))
+                .allMatch(m -> m.codigo().equals("ELE-003"))
+                .isNotEmpty();
+        LocalDate ayer = LocalDate.now().minusDays(1);
+        assertThat(movimientoService.listar(new FiltroMovimientos(null, sucursalId, null, ayer, null, null))).isEmpty();
+    }
+
+    @Test
+    void elHistorialPideUnProductoOUnaSucursal() {
+        assertThatThrownBy(() -> movimientoService.listar(new FiltroMovimientos(null, null, null, null, null, null)))
+                .isInstanceOf(BusinessException.class);
     }
 
     private MovimientoStockDTO movimiento(Long productoId, Long usuarioId, TipoMovimiento tipo, String cantidad,

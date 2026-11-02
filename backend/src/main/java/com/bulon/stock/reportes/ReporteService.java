@@ -2,7 +2,9 @@ package com.bulon.stock.reportes;
 
 import com.bulon.stock.categorias.Categoria;
 import com.bulon.stock.categorias.CategoriaService;
-import com.bulon.stock.movimientos.MovimientoStock;
+import com.bulon.stock.common.Busqueda;
+import com.bulon.stock.movimientos.FiltroMovimientos;
+import com.bulon.stock.movimientos.MovimientoDetalleDTO;
 import com.bulon.stock.movimientos.MovimientoStockService;
 import com.bulon.stock.movimientos.TipoMovimiento;
 import com.bulon.stock.productos.ProductoProveedorDTO;
@@ -18,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -89,7 +90,7 @@ public class ReporteService {
         List<StockSucursalDTO> lista = stockService.listarPorSucursal(sucursalId).stream()
                 .filter(s -> categoriaId == null || categoriaId.equals(categoriaDe.get(s.productoId())))
                 .filter(s -> estado == null || s.estado() == estado)
-                .filter(s -> coincide(busqueda, s.codigo(), s.nombre()))
+                .filter(s -> Busqueda.coincide(busqueda, s.codigo(), s.nombre()))
                 .sorted(Comparator.comparing(StockSucursalDTO::codigo))
                 .toList();
 
@@ -118,22 +119,19 @@ public class ReporteService {
     public ArchivoReporte movimientos(Long sucursalId, LocalDate desde, LocalDate hasta, TipoMovimiento tipo,
                                       String busqueda, FormatoReporte formato) {
         Sucursal sucursal = sucursalService.obtener(sucursalId);
-        List<MovimientoStock> lista = movimientoService.listarDeSucursal(sucursalId, desde, hasta, tipo).stream()
-                .filter(m -> coincide(busqueda, m.getProducto().getCodigo(), m.getProducto().getNombre()))
-                .toList();
+        // La misma consulta que la vista Movimientos (GET /movimientos), con sus mismos filtros
+        List<MovimientoDetalleDTO> lista = movimientoService.listar(
+                new FiltroMovimientos(null, sucursalId, desde, hasta, tipo, busqueda));
 
         List<List<Object>> filas = new ArrayList<>();
         int ingresos = 0;
-        for (MovimientoStock m : lista) {
-            BigDecimal efecto = movimientoService.efecto(m);
-            if (efecto.signum() > 0) {
+        for (MovimientoDetalleDTO m : lista) {
+            if (m.efecto().signum() > 0) {
                 ingresos++;
             }
             filas.add(Arrays.asList(
-                    m.getFecha().format(FECHA_HORA), m.getProducto().getCodigo(), m.getProducto().getNombre(),
-                    TIPO.get(m.getTipo()), efecto, m.getUsuario().getNombre(),
-                    m.getProveedor() != null ? m.getProveedor().getRazonSocial() : "",
-                    detalle(m)));
+                    m.fecha().format(FECHA_HORA), m.codigo(), m.nombre(), TIPO.get(m.tipo()), m.efecto(),
+                    m.stockResultante(), m.usuario(), m.proveedor() != null ? m.proveedor() : "", detalle(m)));
         }
 
         List<String> filtros = new ArrayList<>();
@@ -149,7 +147,8 @@ public class ReporteService {
         Reporte reporte = new Reporte("Movimientos por período",
                 detalles(sucursal, filtros),
                 List.of(Columna.texto("Fecha"), Columna.texto("Código"), Columna.texto("Producto"),
-                        Columna.texto("Tipo"), Columna.numero("Cantidad"), Columna.texto("Responsable"),
+                        Columna.texto("Tipo"), Columna.numero("Cantidad"), Columna.numero("Stock resultante"),
+                        Columna.texto("Responsable"),
                         Columna.texto("Proveedor"), Columna.texto("Detalle")),
                 filas,
                 lista.size() + " movimientos · " + ingresos + " ingresos · " + (lista.size() - ingresos) + " salidas");
@@ -161,7 +160,7 @@ public class ReporteService {
         // Igual que la vista: primero los críticos y después los que más faltan
         List<StockSucursalDTO> lista = stockService.listarAReponer(sucursalId).stream()
                 .filter(s -> estado == null || s.estado() == estado)
-                .filter(s -> coincide(busqueda, s.codigo(), s.nombre()))
+                .filter(s -> Busqueda.coincide(busqueda, s.codigo(), s.nombre()))
                 .sorted(Comparator.comparing((StockSucursalDTO s) -> s.estado() != EstadoStock.CRITICO)
                         .thenComparing(ReporteService::faltante, Comparator.reverseOrder()))
                 .toList();
@@ -219,12 +218,12 @@ public class ReporteService {
         return filtros;
     }
 
-    private static String detalle(MovimientoStock m) {
-        String texto = m.getMotivo() != null ? m.getMotivo() : m.getObservaciones();
-        if (m.getReferencia() == null) {
+    private static String detalle(MovimientoDetalleDTO m) {
+        String texto = m.motivo() != null ? m.motivo() : m.observaciones();
+        if (m.referencia() == null) {
             return texto != null ? texto : "";
         }
-        return texto != null ? texto + " · " + m.getReferencia() : m.getReferencia();
+        return texto != null ? texto + " · " + m.referencia() : m.referencia();
     }
 
     private static BigDecimal faltante(StockSucursalDTO s) {
@@ -233,23 +232,5 @@ public class ReporteService {
 
     private static long contar(List<StockSucursalDTO> lista, EstadoStock estado) {
         return lista.stream().filter(s -> s.estado() == estado).count();
-    }
-
-    /** Búsqueda por código o nombre, sin mayúsculas ni acentos (como en la app). */
-    private static boolean coincide(String busqueda, String... textos) {
-        if (busqueda == null || busqueda.isBlank()) {
-            return true;
-        }
-        String buscado = normalizar(busqueda.trim());
-        for (String texto : textos) {
-            if (texto != null && normalizar(texto).contains(buscado)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String normalizar(String texto) {
-        return Normalizer.normalize(texto, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
     }
 }
