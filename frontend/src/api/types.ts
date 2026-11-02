@@ -130,6 +130,25 @@ export interface UsuarioInput {
   activo: boolean
 }
 
+export type NivelAlerta = 'REPONER' | 'CRITICO'
+
+export interface Notificacion {
+  id: number
+  titulo: string
+  mensaje: string
+  leida: boolean
+  creada: string
+  alertaId: number | null
+  productoId: number | null
+  nivel: NivelAlerta | null
+}
+
+/** Respuesta de GET /notificaciones: las últimas del usuario logueado. */
+export interface Bandeja {
+  noLeidas: number
+  notificaciones: Notificacion[]
+}
+
 /** Respuesta de /auth/login y /auth/registro. */
 export interface Sesion {
   token: string

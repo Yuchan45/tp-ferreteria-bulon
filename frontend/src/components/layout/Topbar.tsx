@@ -3,6 +3,7 @@ import { useRegistrarMovimiento } from '@/components/dialogs/registrar-context'
 import { Button } from '@/components/ui/button'
 import type { Connection } from '@/hooks/useHealth'
 import { cn } from '@/lib/utils'
+import { Notificaciones } from './Notificaciones'
 
 const CONEXION: Record<Connection, { label: string; dot: string }> = {
   checking: { label: 'Verificando…', dot: 'bg-muted-foreground' },
@@ -21,6 +22,7 @@ export function Topbar({ titulo, conexion }: { titulo: string; conexion: Connect
         <span className={cn('size-2 rounded-full', dot)} aria-hidden />
         {label}
       </span>
+      <Notificaciones />
       <Button onClick={() => abrirMovimiento()}>
         <Plus /> Registrar movimiento
       </Button>

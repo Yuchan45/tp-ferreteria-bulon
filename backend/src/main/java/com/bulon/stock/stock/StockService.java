@@ -6,6 +6,8 @@ import com.bulon.stock.productos.Producto;
 import com.bulon.stock.sucursales.Sucursal;
 import com.bulon.stock.sucursales.SucursalService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +16,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Además de consultar el stock, es el Subject del patrón Observer: cada vez que un stock
+ * cambia avisa a los {@link StockObserver} (hoy, el servicio de alertas).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -21,6 +27,8 @@ public class StockService {
 
     private final StockSucursalRepository stockRepository;
     private final SucursalService sucursalService;
+    /** Los suscriptos: Spring inyecta todos los beans que implementan StockObserver. */
+    private final List<StockObserver> observadores;
 
     /** Detalle del stock de un producto en cada sucursal. */
     public List<StockSucursalDTO> listarPorProducto(Long productoId) {
@@ -71,6 +79,8 @@ public class StockService {
                 .orElseThrow(() -> new ResourceNotFoundException("Stock del producto " + productoId + " en sucursal", sucursalId));
         stock.setStockMinimo(request.stockMinimo());
         stock.setPuntoPedido(request.puntoPedido());
+        // Cambiar los umbrales también puede dejar el producto a reponer (o sacarlo)
+        notificar(stock);
         return StockSucursalDTO.from(stock);
     }
 
@@ -82,5 +92,26 @@ public class StockService {
     public StockSucursal buscarParaModificar(Producto producto, Sucursal sucursal) {
         return stockRepository.findById(new StockSucursalId(producto.getId(), sucursal.getId()))
                 .orElseGet(() -> stockRepository.save(new StockSucursal(producto, sucursal)));
+    }
+
+    /** Uso interno del módulo de movimientos: aplica el cambio y avisa a los observadores. */
+    @Transactional
+    public void aplicar(StockSucursal stock, BigDecimal delta) {
+        stock.aplicar(delta);
+        notificar(stock);
+    }
+
+    /**
+     * Al arrancar, avisa el estado de todos los stocks para que las alertas coincidan con
+     * los datos (p. ej. en una base que tenía productos a reponer antes de existir las alertas).
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void revisarTodos() {
+        stockRepository.findAll().forEach(this::notificar);
+    }
+
+    private void notificar(StockSucursal stock) {
+        observadores.forEach(observador -> observador.stockActualizado(stock));
     }
 }

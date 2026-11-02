@@ -44,6 +44,8 @@ ferreteria-bulon/
 │   │   ├── categorias/
 │   │   ├── productos/           # Catálogo y proveedores de cada producto
 │   │   ├── stock/               # Stock por sucursal y reposición
+│   │   ├── alertas/             # Alertas de reposición (observan el stock)
+│   │   ├── notificaciones/      # Avisos in-app (observan las alertas)
 │   │   ├── movimientos/         # Compras, ventas, devoluciones, roturas y ajustes
 │   │   ├── proveedores/
 │   │   ├── usuarios/            # Usuarios y roles
@@ -126,6 +128,8 @@ cd frontend && npm run build && npm run lint
 | GET/PUT  | `/api/productos/{id}`          | Ver / actualizar un producto         |
 | GET      | `/api/productos/{id}/stock`    | Stock del producto por sucursal      |
 | GET      | `/api/productos/bajo-stock`    | Productos que hay que reponer        |
+| GET      | `/api/alertas`                 | Alertas de reposición activas        |
+| GET/PUT  | `/api/notificaciones`          | Notificaciones del usuario / marcarlas como leídas |
 | GET      | `/api/movimientos?productoId=` | Historial de movimientos             |
 | POST     | `/api/movimientos`             | Registrar compra, venta, devolución, rotura o ajuste |
 | GET/POST | `/api/proveedores`             | Listar / crear proveedores           |
@@ -144,7 +148,7 @@ Patrones definidos en la Entrega 2 ([informe](docs/informes/)) y su estado de im
 | Singleton      | Creacional     | Única instancia del pool de conexiones a SQL Server    | Pendiente |
 | Simple Factory | Creacional     | Elegir la estrategia y crear el movimiento según su tipo | Implementado (`movimientos/estrategias/FabricaMovimientos`) |
 | Strategy       | Comportamiento | Validación y efecto sobre el stock de cada movimiento  | Implementado (`movimientos/estrategias/`, una clase por tipo) |
-| Observer       | Comportamiento | Aviso de stock mínimo a distintos interesados          | Pendiente |
+| Observer       | Comportamiento | Aviso de stock mínimo a distintos interesados          | Implementado (`stock/StockObserver` → `alertas/` → `notificaciones/`) |
 | Decorator      | Estructural    | Combinación de canales de notificación de alertas      | Pendiente |
 | Adapter        | Estructural    | Exportación de reportes a PDF / Excel                  | Pendiente |
 

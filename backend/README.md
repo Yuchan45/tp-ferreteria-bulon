@@ -14,6 +14,8 @@ src/main/java/com/bulon/stock/
 ├── categorias/            # Categorías de productos
 ├── productos/             # Catálogo y proveedores de cada producto (N:M, con preferido)
 ├── stock/                 # Stock por producto y sucursal, umbrales y productos a reponer
+├── alertas/               # Alertas de reposición: observan el stock (Observer)
+├── notificaciones/        # Avisos in-app: observan las alertas (Observer)
 ├── movimientos/           # Compras, ventas, devoluciones, roturas y ajustes
 │   └── estrategias/       # Strategy (reglas de cada tipo) + Simple Factory (FabricaMovimientos)
 ├── proveedores/           # Alta y consulta de proveedores
@@ -122,6 +124,9 @@ otro rol). Los administradores se crean desde `POST /api/usuarios`.
 | GET    | `/api/productos/{id}/proveedores`        | 👤 | Proveedores del producto (el preferido primero) |
 | PUT    | `/api/productos/{id}/proveedores/{proveedorId}` | 🔑 | Asociar proveedor o cambiar sus condiciones |
 | GET    | `/api/productos/bajo-stock?sucursalId=`  | 👤 | En o por debajo del punto de pedido (`sucursalId` opcional) |
+| GET    | `/api/alertas?sucursalId=`               | 👤 | Alertas activas, primero las críticas (`sucursalId` opcional) |
+| GET    | `/api/notificaciones`                    | 👤 | `{noLeidas, notificaciones}`: las últimas 30 del usuario del token |
+| PUT    | `/api/notificaciones/{id}/leida`, `/api/notificaciones/leidas` | 👤 | Marcar una / todas como leídas (solo las propias) |
 | GET    | `/api/stock?sucursalId=`                 | 👤 | Stock de todos los productos en una sucursal |
 | GET    | `/api/movimientos?productoId=&sucursalId=` | 👤 | Historial de un producto (`sucursalId` opcional) |
 | POST   | `/api/movimientos`                       | 👤 | Registrar un movimiento |
@@ -139,6 +144,18 @@ otro rol). Los administradores se crean desde `POST /api/usuarios`.
 - Solo los productos por metro, kilo o litro admiten decimales.
 - El stock no puede quedar negativo. Si dos operaciones cambian el mismo stock a la vez, la
   segunda recibe `409` (bloqueo optimista).
+
+### Alertas y notificaciones (patrón Observer)
+
+```
+movimiento o cambio de umbrales → StockService (Subject)
+   └─ AlertaService (StockObserver): abre, sube a CRITICO o resuelve la alerta
+         └─ NotificacionService (AlertaObserver): avisa a los empleados de la sucursal y a los admins
+```
+
+- Hay una sola alerta activa por producto y sucursal: `REPONER` (≤ punto de pedido) o `CRITICO` (≤ mínimo).
+- Se notifica al abrirse una alerta y al subir a `CRITICO`; resolverla no genera aviso.
+- Al arrancar, el backend revisa todo el stock para que las alertas coincidan con los datos.
 
 Errores: `401` sin sesión o credenciales inválidas · `403` rol sin permiso · `404` recurso
 inexistente · `422` regla de negocio · `400` validación · `409` conflicto.

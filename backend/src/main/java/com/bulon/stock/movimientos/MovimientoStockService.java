@@ -59,12 +59,10 @@ public class MovimientoStockService {
         Proveedor proveedor = buscarProveedor(dto, producto);
 
         StockSucursal stock = stockService.buscarParaModificar(producto, sucursal);
-        stock.aplicar(estrategia.delta(dto.cantidad()));
+        // StockService avisa a sus observadores (alertas → notificaciones)
+        stockService.aplicar(stock, estrategia.delta(dto.cantidad()));
 
         MovimientoStock movimiento = fabrica.crear(dto, producto, sucursal, usuario, proveedor);
-
-        // TODO (patrón Observer): si stock.estado() no es OK, avisar para crear la alerta
-        // de reposición y las notificaciones.
         return MovimientoStockDTO.from(movimientoRepository.save(movimiento));
     }
 

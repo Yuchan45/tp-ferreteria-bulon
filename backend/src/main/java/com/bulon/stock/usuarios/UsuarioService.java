@@ -60,6 +60,11 @@ public class UsuarioService {
         return usuarioRepository.findByUsername(username);
     }
 
+    /** Uso interno de las notificaciones: quiénes deben enterarse de lo que pasa en una sucursal. */
+    public List<Usuario> activosDeSucursal(Long sucursalId) {
+        return usuarioRepository.findActivosDeSucursal(sucursalId);
+    }
+
     /** Uso interno de otros módulos (p. ej. el responsable de un movimiento). */
     public Usuario buscarEntidad(Long id) {
         return usuarioRepository.findById(id)
