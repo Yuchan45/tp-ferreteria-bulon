@@ -15,6 +15,7 @@ src/main/java/com/bulon/stock/
 ├── productos/             # Catálogo y proveedores de cada producto (N:M, con preferido)
 ├── stock/                 # Stock por producto y sucursal, umbrales y productos a reponer
 ├── movimientos/           # Compras, ventas, devoluciones, roturas y ajustes
+│   └── estrategias/       # Strategy (reglas de cada tipo) + Simple Factory (FabricaMovimientos)
 ├── proveedores/           # Alta y consulta de proveedores
 ├── usuarios/              # Usuarios (ADMINISTRADOR / EMPLEADO de una sucursal)
 └── seed/                  # Datos de ejemplo para desarrollo

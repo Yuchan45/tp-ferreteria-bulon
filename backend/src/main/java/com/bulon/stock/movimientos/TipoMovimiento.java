@@ -1,5 +1,6 @@
 package com.bulon.stock.movimientos;
 
+/** Tipos de movimiento. Las reglas de cada uno están en su estrategia ({@code movimientos.estrategias}). */
 public enum TipoMovimiento {
     /** Entra stock comprado a un proveedor (requiere proveedor). */
     INGRESO_COMPRA,
@@ -12,13 +13,5 @@ public enum TipoMovimiento {
     /** Rotura o pérdida: sale stock. */
     ROTURA,
     /** Corrección por recuento, con signo (+ o −). */
-    AJUSTE;
-
-    public boolean requiereProveedor() {
-        return this == INGRESO_COMPRA || this == DEVOLUCION_PROVEEDOR;
-    }
-
-    public boolean requiereMotivo() {
-        return this == AJUSTE || this == ROTURA || this == DEVOLUCION_CLIENTE || this == DEVOLUCION_PROVEEDOR;
-    }
+    AJUSTE
 }

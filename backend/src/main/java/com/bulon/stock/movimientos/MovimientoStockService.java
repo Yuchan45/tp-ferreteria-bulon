@@ -1,6 +1,8 @@
 package com.bulon.stock.movimientos;
 
 import com.bulon.stock.common.exception.BusinessException;
+import com.bulon.stock.movimientos.estrategias.EstrategiaMovimiento;
+import com.bulon.stock.movimientos.estrategias.FabricaMovimientos;
 import com.bulon.stock.productos.Producto;
 import com.bulon.stock.productos.ProductoService;
 import com.bulon.stock.proveedores.Proveedor;
@@ -15,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -29,6 +30,7 @@ public class MovimientoStockService {
     private final UsuarioService usuarioService;
     private final ProveedorService proveedorService;
     private final StockService stockService;
+    private final FabricaMovimientos fabrica;
 
     public List<MovimientoStockDTO> listarPorProducto(Long productoId, Long sucursalId) {
         List<MovimientoStock> movimientos = sucursalId == null
@@ -37,6 +39,10 @@ public class MovimientoStockService {
         return movimientos.stream().map(MovimientoStockDTO::from).toList();
     }
 
+    /**
+     * Las reglas que valen para todos los tipos quedan acá; las de cada tipo y su efecto
+     * sobre el stock las resuelve su estrategia (Strategy), elegida por la fábrica (Simple Factory).
+     */
     @Transactional
     public MovimientoStockDTO registrar(MovimientoStockDTO dto) {
         if (dto.usuarioId() == null) {
@@ -47,31 +53,15 @@ public class MovimientoStockService {
         Usuario usuario = usuarioService.buscarEntidad(dto.usuarioId());
 
         validarResponsable(usuario, sucursal);
-        validarCantidad(dto, producto);
-        validarMotivo(dto);
-        Proveedor proveedor = validarProveedor(dto, producto);
-
-        // TODO (patrón Strategy): cada tipo de movimiento tendrá su propia estrategia
-        // de validación y efecto sobre el stock, en lugar de este switch.
-        BigDecimal delta = switch (dto.tipo()) {
-            case INGRESO_COMPRA, DEVOLUCION_CLIENTE -> dto.cantidad();
-            case SALIDA_VENTA, DEVOLUCION_PROVEEDOR, ROTURA -> dto.cantidad().negate();
-            case AJUSTE -> dto.cantidad();
-        };
+        EstrategiaMovimiento estrategia = fabrica.estrategiaPara(dto.tipo());
+        estrategia.validar(dto);
+        validarFraccion(dto, producto);
+        Proveedor proveedor = buscarProveedor(dto, producto);
 
         StockSucursal stock = stockService.buscarParaModificar(producto, sucursal);
-        stock.aplicar(delta);
+        stock.aplicar(estrategia.delta(dto.cantidad()));
 
-        MovimientoStock movimiento = new MovimientoStock();
-        movimiento.setProducto(producto);
-        movimiento.setSucursal(sucursal);
-        movimiento.setUsuario(usuario);
-        movimiento.setTipo(dto.tipo());
-        movimiento.setCantidad(dto.cantidad());
-        movimiento.setMotivo(blancoANull(dto.motivo()));
-        movimiento.setObservaciones(blancoANull(dto.observaciones()));
-        movimiento.setReferencia(blancoANull(dto.referencia()));
-        movimiento.setProveedor(proveedor);
+        MovimientoStock movimiento = fabrica.crear(dto, producto, sucursal, usuario, proveedor);
 
         // TODO (patrón Observer): si stock.estado() no es OK, avisar para crear la alerta
         // de reposición y las notificaciones.
@@ -88,13 +78,7 @@ public class MovimientoStockService {
         }
     }
 
-    private void validarCantidad(MovimientoStockDTO dto, Producto producto) {
-        int signo = dto.cantidad().signum();
-        if (dto.tipo() == TipoMovimiento.AJUSTE ? signo == 0 : signo <= 0) {
-            throw new BusinessException(dto.tipo() == TipoMovimiento.AJUSTE
-                    ? "El ajuste no puede ser 0"
-                    : "La cantidad debe ser mayor a cero");
-        }
+    private void validarFraccion(MovimientoStockDTO dto, Producto producto) {
         boolean tieneFraccion = dto.cantidad().stripTrailingZeros().scale() > 0;
         if (tieneFraccion && !producto.getUnidadMedida().isFraccionable()) {
             throw new BusinessException("El producto " + producto.getCodigo() + " se maneja por "
@@ -102,30 +86,15 @@ public class MovimientoStockService {
         }
     }
 
-    private void validarMotivo(MovimientoStockDTO dto) {
-        if (dto.tipo().requiereMotivo() && blancoANull(dto.motivo()) == null) {
-            throw new BusinessException("El motivo es obligatorio para " + dto.tipo());
-        }
-    }
-
-    private Proveedor validarProveedor(MovimientoStockDTO dto, Producto producto) {
-        if (!dto.tipo().requiereProveedor()) {
-            if (dto.proveedorId() != null) {
-                throw new BusinessException("El proveedor solo se indica en compras y devoluciones a proveedor");
-            }
-            return null;
-        }
+    /** La estrategia ya validó si el tipo lleva proveedor; acá se comprueba que venda el producto. */
+    private Proveedor buscarProveedor(MovimientoStockDTO dto, Producto producto) {
         if (dto.proveedorId() == null) {
-            throw new BusinessException("El proveedor es obligatorio para " + dto.tipo());
+            return null;
         }
         if (!productoService.esProveedorDe(producto.getId(), dto.proveedorId())) {
             throw new BusinessException("El proveedor " + dto.proveedorId()
                     + " no vende el producto " + producto.getCodigo());
         }
         return proveedorService.obtener(dto.proveedorId());
-    }
-
-    private static String blancoANull(String texto) {
-        return texto == null || texto.isBlank() ? null : texto.trim();
     }
 }

@@ -142,8 +142,8 @@ Patrones definidos en la Entrega 2 ([informe](docs/informes/)) y su estado de im
 | Patrón         | Tipo           | Problema que resuelve                                  | Estado    |
 |----------------|----------------|--------------------------------------------------------|-----------|
 | Singleton      | Creacional     | Única instancia del pool de conexiones a SQL Server    | Pendiente |
-| Factory Method | Creacional     | Creación de movimientos de stock según su tipo         | Pendiente |
-| Strategy       | Comportamiento | Validación y efecto sobre el stock de cada movimiento  | Pendiente |
+| Simple Factory | Creacional     | Elegir la estrategia y crear el movimiento según su tipo | Implementado (`movimientos/estrategias/FabricaMovimientos`) |
+| Strategy       | Comportamiento | Validación y efecto sobre el stock de cada movimiento  | Implementado (`movimientos/estrategias/`, una clase por tipo) |
 | Observer       | Comportamiento | Aviso de stock mínimo a distintos interesados          | Pendiente |
 | Decorator      | Estructural    | Combinación de canales de notificación de alertas      | Pendiente |
 | Adapter        | Estructural    | Exportación de reportes a PDF / Excel                  | Pendiente |
