@@ -1,4 +1,18 @@
-import type { Movimiento, StockSucursal, TipoMovimiento } from '@/api/types'
+import type { EstadoStock, Movimiento, StockSucursal, TipoMovimiento } from '@/api/types'
+
+/** Color de cada estado de stock (el punto que se usa en listas y filtros). */
+export const PUNTO_ESTADO: Record<EstadoStock, string> = {
+  OK: 'bg-stock-ok',
+  REPONER: 'bg-stock-low',
+  CRITICO: 'bg-stock-out',
+}
+
+/** Nombre de cada estado en los filtros. */
+export const ESTADO_LABEL: Record<EstadoStock, string> = {
+  OK: 'Normal',
+  REPONER: 'A reponer',
+  CRITICO: 'Crítico',
+}
 
 /** Cuánto falta para volver al punto de pedido. */
 export const faltante = (s: Pick<StockSucursal, 'cantidad' | 'puntoPedido'>) => Math.max(s.puntoPedido - s.cantidad, 0)

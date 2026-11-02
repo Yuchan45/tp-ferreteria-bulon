@@ -8,6 +8,7 @@ import type { TipoMovimiento } from '@/api/types'
 import { ICONO_MOVIMIENTO } from '@/components/badges'
 import { Aviso } from '@/components/common'
 import { Campo, Modal } from '@/components/forms'
+import { ProductoSelector } from '@/components/ProductoSelector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -133,25 +134,16 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
       }
     >
       <Campo label="Producto" htmlFor="mov-producto" error={intentado ? errores.producto : undefined}>
-        <Select
+        <ProductoSelector
+          id="mov-producto"
           value={productoId}
-          onValueChange={(v) => {
+          onChange={(v) => {
             setProductoId(v)
             setProveedorElegido('')
           }}
-          disabled={!stock.data}
-        >
-          <SelectTrigger id="mov-producto" className="w-full" aria-invalid={intentado && !!errores.producto}>
-            <SelectValue placeholder={stock.data ? 'Seleccionar producto' : 'Cargando productos…'} />
-          </SelectTrigger>
-          <SelectContent position="popper" className="max-h-72">
-            {stock.data?.map((s) => (
-              <SelectItem key={s.productoId} value={String(s.productoId)}>
-                <span className="font-mono text-[13px]">{s.codigo}</span> · {s.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          productos={stock.data}
+          invalid={intentado && !!errores.producto}
+        />
       </Campo>
 
       <div className="flex flex-col gap-1.5">
