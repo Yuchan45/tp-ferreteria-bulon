@@ -253,7 +253,8 @@ WHERE ss.cantidad <= ss.punto_pedido
 GROUP BY s.codigo, pr.razon_social, pr.telefono, pr.email
 ORDER BY s.codigo, costo_estimado DESC;
 
--- 6.4 Proveedor más barato para cada producto a reponer (lo que hará la Strategy "menor costo")
+-- 6.4 Proveedor más barato para cada producto a reponer (para comparar con el preferido; la
+--     elección automática del proveedor quedó fuera de alcance junto con las solicitudes)
 SELECT p.codigo, p.nombre, mejor.razon_social AS proveedor_mas_barato, mejor.precio_costo, mejor.plazo_entrega_dias
 FROM stock_sucursal ss
 JOIN productos p ON p.id = ss.producto_id
@@ -284,7 +285,8 @@ JOIN productos p ON p.id = ss.producto_id
 LEFT JOIN producto_proveedor pp ON pp.producto_id = p.id AND pp.preferido = 1
 GROUP BY s.codigo;
 
--- 6.7 Cambios recientes de umbrales (auditoría de stock mínimo y punto de pedido)
+-- 6.7 Últimas modificaciones del stock (auditoría: un movimiento o un cambio de umbrales;
+--     actualizado_por es el usuario del token, NULL si lo cambió el seeder)
 SELECT TOP (20) p.codigo, s.codigo AS sucursal, ss.stock_minimo, ss.punto_pedido,
        u.username AS actualizado_por, ss.actualizado_en
 FROM stock_sucursal ss
@@ -409,12 +411,12 @@ GO
  * 9. REPORTES Y RESÚMENES
  * ═══════════════════════════════════════════════════════════════════════ */
 
--- 9.1 Resumen general (los indicadores del panel)
+-- 9.1 Resumen general (los indicadores del panel: "a reponer" incluye a los críticos)
 SELECT
     (SELECT COUNT(*) FROM productos WHERE activo = 1)                                  AS productos_activos,
-    (SELECT COUNT(*) FROM stock_sucursal
-      WHERE cantidad > stock_minimo AND cantidad <= punto_pedido)                      AS a_reponer,
+    (SELECT COUNT(*) FROM stock_sucursal WHERE cantidad <= punto_pedido)               AS a_reponer,
     (SELECT COUNT(*) FROM stock_sucursal WHERE cantidad <= stock_minimo)               AS criticos,
+    (SELECT COUNT(*) FROM alertas_stock WHERE estado = 'ABIERTA')                      AS alertas_abiertas,
     (SELECT COUNT(*) FROM stock_sucursal WHERE cantidad = 0)                           AS sin_stock,
     (SELECT COUNT(*) FROM movimientos_stock
       WHERE CAST(fecha AS DATE) = CAST(GETDATE() AS DATE))                             AS movimientos_hoy,

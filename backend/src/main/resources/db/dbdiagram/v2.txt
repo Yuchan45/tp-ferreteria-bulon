@@ -20,7 +20,8 @@ Project bulon_stock {
 
     **Auditoría:** los movimientos registran quién cambió el stock. Las tablas
     maestras guardan quién y cuándo las modificó por última vez
-    (actualizado_por / actualizado_en).
+    (actualizado_por / actualizado_en), que el backend completa con el usuario
+    del token al guardar.
   '''
 }
 
@@ -77,7 +78,7 @@ Table usuarios {
   username      varchar(50)  [not null, unique]
   nombre        varchar(100) [not null]
   email         varchar(150) [unique, note: 'Único si no es NULL (índice filtrado)']
-  password_hash varchar(100) [not null, note: 'BCrypt; preparado para el login']
+  password_hash varchar(100) [not null, note: 'BCrypt; lo verifica el login (JWT)']
   rol           rol          [not null]
   sucursal_id   bigint       [note: 'CHECK: EMPLEADO → NOT NULL; ADMINISTRADOR → NULL']
   activo        bit          [not null, default: 1]
@@ -131,7 +132,7 @@ Table producto_proveedor {
   plazo_entrega_dias int           [note: 'CHECK >= 0. Para elegir el proveedor más rápido']
 
   indexes {
-    producto_id [unique, name: 'uq_proveedor_preferido', note: 'WHERE preferido = 1 → un solo preferido por producto']
+    producto_id [unique, name: 'uq_producto_proveedor_preferido', note: 'WHERE preferido = 1 → un solo preferido por producto']
   }
 
   Note: 'Qué proveedores venden cada producto (N:M).'
@@ -166,8 +167,9 @@ Table movimientos_stock {
   proveedor_id  bigint          [note: 'Obligatorio en INGRESO_COMPRA y DEVOLUCION_PROVEEDOR']
 
   indexes {
-    (producto_id, sucursal_id, fecha) [name: 'ix_mov_producto_sucursal_fecha', note: 'Historial por producto']
-    (sucursal_id, fecha) [name: 'ix_mov_sucursal_fecha', note: 'Historial por sucursal']
+    (producto_id, sucursal_id, fecha) [name: 'ix_movimientos_producto_sucursal_fecha', note: 'Historial por producto']
+    (sucursal_id, fecha) [name: 'ix_movimientos_sucursal_fecha', note: 'Historial por sucursal (reportes)']
+    usuario_id [name: 'ix_movimientos_usuario']
   }
 
   Note: 'Inmutable: nunca se edita ni se borra; los errores se corrigen con un AJUSTE.'
@@ -189,6 +191,7 @@ Table alertas_stock {
 
   indexes {
     (producto_id, sucursal_id) [unique, name: 'uq_alertas_activa', note: "WHERE estado = 'ABIERTA' → una sola alerta activa"]
+    (sucursal_id, estado) [name: 'ix_alertas_sucursal_estado']
   }
 
   Note: 'Se crea cuando la cantidad llega al punto de pedido; sube a CRITICO si llega al mínimo y se resuelve cuando la cantidad vuelve a superarlo.'
@@ -204,10 +207,10 @@ Table notificaciones {
   creada     datetime2    [not null, default: `SYSDATETIME()`]
 
   indexes {
-    (usuario_id, leida, creada) [name: 'ix_notif_usuario']
+    (usuario_id, leida, creada) [name: 'ix_notificaciones_usuario']
   }
 
-  Note: 'Al abrir una alerta se notifica a los empleados de esa sucursal y a los administradores.'
+  Note: 'Al abrir una alerta o subir a CRITICO se notifica a los empleados de esa sucursal y a los administradores (campanita; las críticas también por email simulado).'
 }
 
 // ───────────────────────── Relaciones ────────────────────────
