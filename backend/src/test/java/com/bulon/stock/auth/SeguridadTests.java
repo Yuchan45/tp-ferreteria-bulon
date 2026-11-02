@@ -1,5 +1,6 @@
 package com.bulon.stock.auth;
 
+import com.bulon.stock.proveedores.ProveedorService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,8 @@ class SeguridadTests {
     private MockMvc mvc;
     @Autowired
     private ObjectMapper json;
+    @Autowired
+    private ProveedorService proveedorService;
 
     @Test
     void sinTokenLaApiRespondeNoAutorizado() throws Exception {
@@ -140,6 +143,19 @@ class SeguridadTests {
 
         mvc.perform(api(post("/api/auth/registro")).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void laAuditoriaGuardaQuienModificoLaFila() throws Exception {
+        long adminId = login("admin", "admin").at("/usuario/id").asLong();
+        String respuesta = mvc.perform(conToken(post("/api/proveedores"), token("admin"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"razonSocial\":\"Proveedor Auditado S.A.\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Long proveedorId = json.readTree(respuesta).get("id").asLong();
+        assertThat(proveedorService.obtener(proveedorId).getActualizadoPor()).isEqualTo(adminId);
     }
 
     @Test

@@ -1,10 +1,8 @@
 package com.bulon.stock.alertas;
 
 public enum EstadoAlerta {
-    /** Recién generada, nadie la atendió. */
+    /** El producto está en o por debajo del punto de pedido. */
     ABIERTA,
-    /** Hay una solicitud de reposición en curso. */
-    EN_GESTION,
     /** El stock volvió a superar el punto de pedido. */
     RESUELTA
 }

@@ -1,7 +1,7 @@
 /*
  * Bulón S.R.L. — Consultas básicas de uso manual
  *
- * Esquema v2 (migraciones V1 + V2__sucursales_y_reposicion.sql). Base: bulon_stock (SQL Server).
+ * Esquema v2 (migraciones V1, V2__sucursales_y_reposicion.sql y V3__quitar_solicitudes_reposicion.sql). Base: bulon_stock (SQL Server).
  * Todas son de solo lectura (SELECT). Los parámetros se cambian en cada DECLARE.
  *
  * Efecto de cada tipo de movimiento sobre el stock:
@@ -19,7 +19,7 @@
  *    5. Productos
  *    6. Stock por sucursal y reposición
  *    7. Movimientos de stock
- *    8. Alertas, solicitudes de reposición y notificaciones
+ *    8. Alertas y notificaciones
  *    9. Reportes y resúmenes
  *   10. Controles de integridad
  *   11. Esquema y migraciones
@@ -372,9 +372,8 @@ GO
 
 
 /* ═══════════════════════════════════════════════════════════════════════
- * 8. ALERTAS, SOLICITUDES DE REPOSICIÓN Y NOTIFICACIONES
- *    (las tablas existen; se completan cuando se implementen los patrones
- *     Observer y State en el backend)
+ * 8. ALERTAS Y NOTIFICACIONES
+ *    (las completa el backend con el patrón Observer al cambiar el stock)
  * ═══════════════════════════════════════════════════════════════════════ */
 
 -- 8.1 Alertas activas por sucursal y nivel
@@ -383,7 +382,7 @@ SELECT s.codigo AS sucursal, p.codigo, a.nivel, a.estado, a.cantidad_al_generar,
 FROM alertas_stock a
 JOIN productos p ON p.id = a.producto_id
 JOIN sucursales s ON s.id = a.sucursal_id
-WHERE a.estado IN ('ABIERTA', 'EN_GESTION')
+WHERE a.estado = 'ABIERTA'
 ORDER BY CASE a.nivel WHEN 'CRITICO' THEN 0 ELSE 1 END, a.creada;
 
 -- 8.2 Productos a reponer que todavía no tienen alerta activa
@@ -394,29 +393,10 @@ JOIN sucursales s ON s.id = ss.sucursal_id
 WHERE ss.cantidad <= ss.punto_pedido
   AND NOT EXISTS (SELECT 1 FROM alertas_stock a
                   WHERE a.producto_id = ss.producto_id AND a.sucursal_id = ss.sucursal_id
-                    AND a.estado IN ('ABIERTA', 'EN_GESTION'))
+                    AND a.estado = 'ABIERTA')
 ORDER BY s.codigo, p.codigo;
 
--- 8.3 Solicitudes de reposición con su proveedor y cantidad de ítems
-SELECT sr.id, s.codigo AS sucursal, pr.razon_social AS proveedor, sr.estado,
-       sr.creada, sr.enviada, sr.recibida, u.username AS creada_por,
-       (SELECT COUNT(*) FROM solicitud_items si WHERE si.solicitud_id = sr.id) AS items
-FROM solicitudes_reposicion sr
-JOIN sucursales s ON s.id = sr.sucursal_id
-JOIN proveedores pr ON pr.id = sr.proveedor_id
-JOIN usuarios u ON u.id = sr.usuario_id
-ORDER BY sr.creada DESC;
-
--- 8.4 Ítems de solicitudes recibidas con diferencia entre lo pedido y lo recibido
-SELECT sr.id AS solicitud, p.codigo, si.cantidad_solicitada, si.cantidad_recibida,
-       si.cantidad_solicitada - ISNULL(si.cantidad_recibida, 0) AS diferencia
-FROM solicitud_items si
-JOIN solicitudes_reposicion sr ON sr.id = si.solicitud_id
-JOIN productos p ON p.id = si.producto_id
-WHERE sr.estado = 'RECIBIDA'
-  AND si.cantidad_recibida < si.cantidad_solicitada;
-
--- 8.5 Notificaciones sin leer por usuario
+-- 8.3 Notificaciones sin leer por usuario
 SELECT u.username, COUNT(*) AS sin_leer, MAX(n.creada) AS ultima
 FROM notificaciones n
 JOIN usuarios u ON u.id = n.usuario_id

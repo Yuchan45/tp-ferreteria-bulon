@@ -42,7 +42,8 @@ docker compose down -v      # detiene y BORRA los datos
 
 El esquema lo manejan las migraciones de **Flyway** en `src/main/resources/db/migration`,
 que se aplican solas al iniciar el backend. Hibernate solo valida que las entidades coincidan
-(`ddl-auto: validate`). Para cambiar el modelo se agrega un script nuevo (`V2__descripcion.sql`, ...);
+(`ddl-auto: validate`). Hoy hay tres: `V1` (esquema inicial), `V2` (sucursales, categorías, alertas y
+notificaciones) y `V3` (quita las solicitudes de reposición, fuera de alcance). Para cambiar el modelo se agrega un script nuevo (`V4__descripcion.sql`, ...);
 nunca se modifica uno ya aplicado.
 
 ## Configuración

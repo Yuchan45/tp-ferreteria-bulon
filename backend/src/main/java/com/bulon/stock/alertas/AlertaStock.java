@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 /**
  * Aviso de que un producto necesita reposición en una sucursal. Hay a lo sumo una
- * alerta activa (no RESUELTA) por producto y sucursal (índice uq_alertas_activa).
+ * alerta activa (ABIERTA) por producto y sucursal (índice uq_alertas_activa).
  */
 @Entity
 @Table(name = "alertas_stock")
@@ -51,10 +51,6 @@ public class AlertaStock {
 
     @Column(name = "stock_minimo", nullable = false, precision = 12, scale = 3)
     private BigDecimal stockMinimo;
-
-    /** Solicitud de reposición que la atiende (se usará con las solicitudes). */
-    @Column(name = "solicitud_id")
-    private Long solicitudId;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime creada = LocalDateTime.now();
