@@ -5,6 +5,9 @@ import com.bulon.stock.alertas.AlertaStock;
 import com.bulon.stock.alertas.CambioAlerta;
 import com.bulon.stock.alertas.NivelAlerta;
 import com.bulon.stock.common.exception.ResourceNotFoundException;
+import com.bulon.stock.notificaciones.canales.ConEmail;
+import com.bulon.stock.notificaciones.canales.Notificador;
+import com.bulon.stock.notificaciones.canales.NotificadorSistema;
 import com.bulon.stock.usuarios.Usuario;
 import com.bulon.stock.usuarios.UsuarioService;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +20,8 @@ import java.util.List;
 
 /**
  * Observa las alertas (es un {@link AlertaObserver}): cuando se abre una o sube a CRITICO,
- * avisa a los empleados de esa sucursal y a los administradores.
+ * avisa a los empleados de esa sucursal y a los administradores, por los canales que
+ * corresponden al nivel de la alerta (ver {@link #notificadorPara}).
  */
 @Service
 @RequiredArgsConstructor
@@ -29,6 +33,8 @@ public class NotificacionService implements AlertaObserver {
 
     private final NotificacionRepository notificacionRepository;
     private final UsuarioService usuarioService;
+    /** Canal base (campanita), que los decoradores envuelven. */
+    private final NotificadorSistema sistema;
 
     @Override
     @Transactional
@@ -43,19 +49,18 @@ public class NotificacionService implements AlertaObserver {
                 + " (punto de pedido " + numero(alerta.getPuntoPedido())
                 + ", mínimo " + numero(alerta.getStockMinimo()) + ").";
 
+        Notificador notificador = notificadorPara(alerta.getNivel());
         for (Usuario destinatario : usuarioService.activosDeSucursal(alerta.getSucursal().getId())) {
-            enviar(destinatario, alerta, titulo, mensaje);
+            notificador.enviar(destinatario, alerta, titulo, mensaje);
         }
     }
 
-    /** Canal in-app: queda en la tabla notificaciones y la muestra la campanita. */
-    private void enviar(Usuario destinatario, AlertaStock alerta, String titulo, String mensaje) {
-        Notificacion notificacion = new Notificacion();
-        notificacion.setUsuario(destinatario);
-        notificacion.setAlerta(alerta);
-        notificacion.setTitulo(titulo);
-        notificacion.setMensaje(mensaje);
-        notificacionRepository.save(notificacion);
+    /**
+     * Patrón Decorator: los canales se combinan envolviendo al notificador base.
+     * Lo urgente sale por más canales: REPONER → campanita; CRITICO → campanita + email.
+     */
+    Notificador notificadorPara(NivelAlerta nivel) {
+        return nivel == NivelAlerta.CRITICO ? new ConEmail(sistema) : sistema;
     }
 
     public BandejaDTO bandeja(Long usuarioId) {

@@ -16,6 +16,7 @@ src/main/java/com/bulon/stock/
 ├── stock/                 # Stock por producto y sucursal, umbrales y productos a reponer
 ├── alertas/               # Alertas de reposición: observan el stock (Observer)
 ├── notificaciones/        # Avisos in-app: observan las alertas (Observer)
+│   └── canales/           # Decorator: NotificadorSistema (campanita) + ConEmail
 ├── movimientos/           # Compras, ventas, devoluciones, roturas y ajustes
 │   └── estrategias/       # Strategy (reglas de cada tipo) + Simple Factory (FabricaMovimientos)
 ├── proveedores/           # Alta y consulta de proveedores
@@ -155,6 +156,16 @@ movimiento o cambio de umbrales → StockService (Subject)
 
 - Hay una sola alerta activa por producto y sucursal: `REPONER` (≤ punto de pedido) o `CRITICO` (≤ mínimo).
 - Se notifica al abrirse una alerta y al subir a `CRITICO`; resolverla no genera aviso.
+- Los canales dependen del nivel (patrón Decorator, `notificaciones/canales/`): lo urgente sale
+  por más canales. Le llega igual a todos los destinatarios, empleados y administradores.
+
+  | Nivel     | Canales                        | Notificador                              |
+  |-----------|--------------------------------|------------------------------------------|
+  | `REPONER` | Campanita                      | `NotificadorSistema`                     |
+  | `CRITICO` | Campanita + email              | `new ConEmail(NotificadorSistema)`       |
+
+  El email es **simulado**: se escribe en el log `[EMAIL] a ventas@bulon.com.ar: Stock crítico: …`.
+  Un usuario sin email recibe solo la campanita.
 - Al arrancar, el backend revisa todo el stock para que las alertas coincidan con los datos.
 
 Errores: `401` sin sesión o credenciales inválidas · `403` rol sin permiso · `404` recurso

@@ -14,8 +14,11 @@ import com.bulon.stock.usuarios.UsuarioDTO;
 import com.bulon.stock.usuarios.UsuarioService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 })
 @ActiveProfiles("test")
 @Transactional
+@ExtendWith(OutputCaptureExtension.class)
 class AlertasYNotificacionesTests {
 
     /** El seeder deja 9 productos a reponer y 3 usuarios que operan SUC-01. */
@@ -107,6 +111,22 @@ class AlertasYNotificacionesTests {
         assertThat(notificacionService.bandeja(ventasId).noLeidas()).isEqualTo(antes + 1);
         assertThat(notificacionService.bandeja(ventasId).notificaciones().getFirst().titulo())
                 .startsWith("Stock crítico");
+    }
+
+    @Test
+    void lasAlertasCriticasTambienSalenPorEmailYLasDeReponerNo(CapturedOutput salida) {
+        ProductoDTO destornillador = producto("HER-002");
+        // La salida ya trae los emails de las alertas críticas del seeder: se mira solo lo nuevo
+        int desde = salida.getOut().length();
+
+        registrar(destornillador, TipoMovimiento.SALIDA_VENTA, "10", null); // REPONER → solo campanita
+        assertThat(salida.getOut().substring(desde)).doesNotContain("[EMAIL]");
+
+        registrar(destornillador, TipoMovimiento.SALIDA_VENTA, "5", null);  // CRITICO → campanita + email
+        // (solo partes ASCII: la consola de Windows puede no mostrar bien los acentos)
+        assertThat(salida.getOut().substring(desde))
+                .contains("[EMAIL] a ventas@bulon.com.ar: Stock cr", destornillador.nombre() + " - Quedan 10")
+                .contains("[EMAIL] a admin@bulon.com.ar");
     }
 
     @Test

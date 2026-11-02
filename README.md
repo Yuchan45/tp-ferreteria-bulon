@@ -149,7 +149,7 @@ Patrones definidos en la Entrega 2 ([informe](docs/informes/)) y su estado de im
 | Simple Factory | Creacional     | Elegir la estrategia y crear el movimiento según su tipo | Implementado (`movimientos/estrategias/FabricaMovimientos`) |
 | Strategy       | Comportamiento | Validación y efecto sobre el stock de cada movimiento  | Implementado (`movimientos/estrategias/`, una clase por tipo) |
 | Observer       | Comportamiento | Aviso de stock mínimo a distintos interesados          | Implementado (`stock/StockObserver` → `alertas/` → `notificaciones/`) |
-| Decorator      | Estructural    | Combinación de canales de notificación de alertas      | Pendiente |
+| Decorator      | Estructural    | Combinación de canales de notificación de alertas      | Implementado (`notificaciones/canales/`: campanita + email según el nivel) |
 | Adapter        | Estructural    | Exportación de reportes a PDF / Excel                  | Pendiente |
 
 ## Base de datos

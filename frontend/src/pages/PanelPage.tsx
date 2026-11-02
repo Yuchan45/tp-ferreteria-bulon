@@ -21,9 +21,10 @@ export function PanelPage() {
   if (stock.error) return <ErrorCarga error={stock.error} onRetry={stock.reload} />
 
   const lista = stock.data ?? []
-  const aReponer = lista.filter((s) => s.estado === 'REPONER').length
-  const criticos = lista.filter((s) => s.estado === 'CRITICO').length
+  // Los críticos también están por debajo del punto de pedido: "A reponer" los incluye
   const alertas = lista.filter((s) => s.estado !== 'OK').sort(porUrgencia)
+  const aReponer = alertas.length
+  const criticos = lista.filter((s) => s.estado === 'CRITICO').length
   const hoy = (movimientos.data ?? []).filter((m) => esHoy(m.fecha))
   const ingresosHoy = hoy.filter((m) => delta(m.tipo, m.cantidad) > 0).length
   const salidasHoy = hoy.filter((m) => delta(m.tipo, m.cantidad) < 0).length

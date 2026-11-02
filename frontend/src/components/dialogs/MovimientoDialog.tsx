@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, CircleX, TriangleAlert } from 'lucide-react'
+import { ChevronRight, CircleAlert, CircleX, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { listarStock } from '@/api/catalogo'
 import { registrarMovimiento } from '@/api/movimientos'
@@ -258,12 +258,24 @@ export function MovimientoDialog({ open, onOpenChange, preset }: Props) {
             <p className="flex items-center gap-2 text-[13px] text-stock-out">
               <CircleX className="size-4" /> No se puede registrar: el stock no puede quedar negativo.
             </p>
+          ) : resultante != null && resultante <= fila.stockMinimo ? (
+            // Mismas reglas que el backend: se avisa solo si la alerta es nueva o sube a crítica
+            <p className="flex items-center gap-2 text-[13px] text-stock-out">
+              <CircleAlert className="size-4 shrink-0" />
+              <span>
+                Quedará en o por debajo del stock mínimo ({fmtNumero(fila.stockMinimo)}): stock crítico.
+                {fila.estado !== 'CRITICO' && ' Se avisará por la campanita y por email.'}
+              </span>
+            </p>
           ) : (
             resultante != null &&
             resultante <= fila.puntoPedido && (
               <p className="flex items-center gap-2 text-[13px] text-stock-low">
-                <TriangleAlert className="size-4" /> Quedará en o por debajo del punto de pedido ({fmtNumero(fila.puntoPedido)}) y
-                aparecerá en "A reponer".
+                <TriangleAlert className="size-4 shrink-0" />
+                <span>
+                  Quedará en o por debajo del punto de pedido ({fmtNumero(fila.puntoPedido)}) y aparecerá en "A reponer".
+                  {fila.estado === 'OK' && ' Se avisará por la campanita.'}
+                </span>
               </p>
             )
           )}
