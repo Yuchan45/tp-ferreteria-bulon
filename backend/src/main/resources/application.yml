@@ -19,6 +19,11 @@ spring:
   flyway:
     # El esquema lo crean las migraciones de src/main/resources/db/migration
     enabled: true
+  output:
+    ansi:
+      # Colores en la consola siempre: Spring no detecta que la terminal de VS Code / Git Bash
+      # los admite. Así se resaltan los emails simulados ([EMAIL]) en la demo.
+      enabled: always
   jpa:
     hibernate:
       # Hibernate solo verifica que las entidades coincidan con el esquema creado por Flyway

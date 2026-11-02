@@ -98,20 +98,48 @@ class SeguridadTests {
     }
 
     @Test
-    void elRegistroCreaUnEmpleadoAunqueSePidaOtroRol() throws Exception {
+    void elRegistroCreaUnEmpleadoDeLaSucursalElegida() throws Exception {
         String body = """
                 {"username":"nuevo","nombre":"Empleado Nuevo","password":"clave-segura",
-                 "sucursalId":%d,"rol":"ADMINISTRADOR"}""".formatted(sucursalId());
+                 "sucursalId":%d,"rol":"EMPLEADO"}""".formatted(sucursalId());
 
         String respuesta = mvc.perform(api(post("/api/auth/registro")).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.usuario.rol").value("EMPLEADO"))
+                .andExpect(jsonPath("$.usuario.sucursalId").value(sucursalId()))
                 .andReturn().getResponse().getContentAsString();
 
         String token = json.readTree(respuesta).get("token").asText();
         mvc.perform(conToken(get("/api/auth/yo"), token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("nuevo"));
+        mvc.perform(conToken(get("/api/usuarios"), token)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void sinRolElRegistroCreaUnAdministradorSinSucursal() throws Exception {
+        // Aunque el formulario mande una sucursal, el administrador ve todas
+        String body = """
+                {"username":"nuevo-admin","nombre":"Admin Nuevo","password":"clave-segura",
+                 "sucursalId":%d}""".formatted(sucursalId());
+
+        String respuesta = mvc.perform(api(post("/api/auth/registro")).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.usuario.rol").value("ADMINISTRADOR"))
+                .andExpect(jsonPath("$.usuario.sucursalId").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        String token = json.readTree(respuesta).get("token").asText();
+        mvc.perform(conToken(get("/api/usuarios"), token)).andExpect(status().isOk());
+    }
+
+    @Test
+    void unEmpleadoSinSucursalNoSePuedeRegistrar() throws Exception {
+        String body = """
+                {"username":"sin-sucursal","nombre":"Sin Sucursal","password":"clave-segura","rol":"EMPLEADO"}""";
+
+        mvc.perform(api(post("/api/auth/registro")).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test

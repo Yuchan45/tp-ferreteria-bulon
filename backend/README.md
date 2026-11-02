@@ -103,8 +103,10 @@ La protección tiene tres capas:
 3. **Datos** (servicios): un `EMPLEADO` solo opera su sucursal y el responsable de cada
    movimiento sale del token, no del cuerpo del pedido.
 
-El registro público siempre crea un `EMPLEADO` activo de la sucursal elegida (aunque se envíe
-otro rol). Los administradores se crean desde `POST /api/usuarios`.
+Por ser un proyecto académico, el registro público permite **elegir el rol** para probar el
+sistema con los dos perfiles: sin `rol` se crea un `ADMINISTRADOR` (sin sucursal, aunque se envíe
+una); un `EMPLEADO` debe indicar su `sucursalId`. En un sistema real, el registro crearía solo
+empleados y los administradores se darían de alta desde `POST /api/usuarios`.
 
 ## Endpoints
 
@@ -114,7 +116,7 @@ otro rol). Los administradores se crean desde `POST /api/usuarios`.
 |--------|------------------------------------------|--------|-------------|
 | GET    | `/api/health`                            | 🔓 | Estado de la API y de la base (200 `UP` / 503 `DOWN`) |
 | POST   | `/api/auth/login`                        | 🔓 | `{username, password}` → `{token, expira, usuario}` |
-| POST   | `/api/auth/registro`                     | 🔓 | Alta como `EMPLEADO`, devuelve la sesión iniciada (201) |
+| POST   | `/api/auth/registro`                     | 🔓 | Alta con el `rol` elegido (por defecto `ADMINISTRADOR`), devuelve la sesión iniciada (201) |
 | GET    | `/api/auth/yo`                           | 👤 | Usuario del token |
 | GET    | `/api/sucursales`, `/api/sucursales/{id}`| 🔓 | Sucursales |
 | GET / POST | `/api/categorias`                    | 👤 / 🔑 | Listar / crear categorías |

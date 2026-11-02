@@ -105,7 +105,8 @@ npm run dev               # http://localhost:5173
 ```
 
 Se entra con `admin` / `admin` (administrador) o `ventas` / `empleado` (empleado), o
-creando una cuenta en `/registro` (siempre como empleado). El menú y los botones de alta se
+creando una cuenta en `/registro`, donde se elige el rol (por defecto administrador; el empleado
+elige su sucursal). El menú y los botones de alta se
 adaptan al rol, pero la seguridad real la aplica el backend.
 
 Si el backend corre en otro puerto: `BACKEND_URL=http://localhost:8081 npm run dev`.

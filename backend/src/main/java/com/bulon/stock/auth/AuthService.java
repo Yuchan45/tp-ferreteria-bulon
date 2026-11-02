@@ -37,8 +37,12 @@ public class AuthService {
     /** Registro público con acceso inmediato: crea un EMPLEADO de la sucursal elegida y lo loguea. */
     @Transactional
     public SesionResponse registrar(RegistroRequest request) {
+        Rol rol = request.rolElegido();
+        // El administrador ve todas las sucursales: si el formulario manda una, se ignora.
+        // Las demás reglas (un empleado necesita sucursal) las valida UsuarioService.
+        Long sucursalId = rol == Rol.ADMINISTRADOR ? null : request.sucursalId();
         UsuarioDTO creado = usuarioService.crear(new UsuarioRequest(request.username(), request.nombre(),
-                request.email(), request.password(), Rol.EMPLEADO, request.sucursalId(), true));
+                request.email(), request.password(), rol, sucursalId, true));
         return sesion(usuarioService.buscarEntidad(creado.id()));
     }
 

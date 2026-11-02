@@ -17,7 +17,7 @@ import { ROL_LABEL } from '@/lib/format'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-/** Alta de usuario por un administrador: a diferencia del registro público, puede elegir el rol. */
+/** Alta de usuario por un administrador, con su rol y sucursal. */
 export function UsuarioDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { invalidate } = useDataVersion()
   const sucursales = useApi((signal) => listarSucursales(signal))

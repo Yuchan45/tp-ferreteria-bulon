@@ -1,4 +1,15 @@
-import { ArrowLeftRight, LayoutDashboard, LogOut, Package, TriangleAlert, Truck, Users, type LucideIcon } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  ShieldCheck,
+  TriangleAlert,
+  Truck,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import { NavLink } from 'react-router'
 import { listarAReponer } from '@/api/productos'
 import { useSesion, useAuth } from '@/hooks/auth-context'
@@ -29,6 +40,7 @@ export function Sidebar() {
   const { cerrarSesion } = useAuth()
   const aReponer = useApi((signal) => listarAReponer(sucursal.id, signal), [sucursal.id])
   const pendientes = aReponer.data?.length ?? 0
+  const RolIcono = esAdmin ? ShieldCheck : UserRound
 
   return (
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col gap-1 bg-sidebar px-4 pt-5 pb-4 text-sidebar-foreground">
@@ -70,13 +82,23 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto flex items-center gap-3 border-t border-sidebar-border px-2 pt-3">
+      {/* Con qué rol se está usando el sistema: cambia el menú, los botones y lo que permite el backend */}
+      <section aria-label="Rol del usuario" className="mt-auto mb-3 rounded-lg bg-sidebar-accent/60 px-3 py-2.5">
+        <p className="text-[11px] font-medium tracking-wide text-sidebar-muted uppercase">Rol</p>
+        <p className="mt-1 flex items-center gap-2 font-medium">
+          <RolIcono className={cn('size-4 shrink-0', esAdmin && 'text-stock-ok')} aria-hidden />
+          {ROL_LABEL[usuario.rol]}
+        </p>
+        <p className="mt-0.5 text-[13px] text-sidebar-muted">{esAdmin ? 'Todas las sucursales' : `Solo ${sucursal.nombre}`}</p>
+      </section>
+
+      <div className="flex items-center gap-3 border-t border-sidebar-border px-2 pt-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-[13px] font-medium">
           {iniciales(usuario.nombre)}
         </div>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-[13px] font-medium">{usuario.nombre}</p>
-          <p className="text-[13px] text-sidebar-muted">{ROL_LABEL[usuario.rol]}</p>
+          <p className="truncate font-mono text-[13px] text-sidebar-muted">{usuario.username}</p>
         </div>
         <button
           type="button"
